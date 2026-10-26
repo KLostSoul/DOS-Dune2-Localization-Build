@@ -1,0 +1,63 @@
+		     DUNE II: THE BUILDING OF A DYNASTY
+
+		     Multiple Sound Device Patch (Beta)
+	  
+				  (09/22/93)      
+
+This patch will allow you to play DUNE II music and sound effects on more
+than one audio sound device at one time.  Simply follow the directions
+listed below.  
+
+ATTENTION!  THIS IS AN OPTIONAL PATCH.  IT IS NOT REQUIRED TO PLAY THE GAME. 
+
+It is intended only for users that own and use more than one sound device
+or card at a time.  If you only use one sound device, you do not need this 
+patch.
+
+
+1. Backup the following files...  
+   DUNE.CFG, SETUP.EXE, and SETUPENG.DIP
+
+   These files can be found on your hard drive in the directory where you 
+   installed Dune II.
+
+
+2. Copy the new SETUP.EXE, and SETUPENG.DIP into the directory 
+   where DUNE II is stored.
+
+
+3. Run SETUP.EXE and configure your sound devices.  When using two different
+   sources for sound output, memory requirements will be high.  To run DUNE II 
+   we recommend at least 621,000 bytes of free lower memory.  It is 
+   enitrely possible that your configuration will require more or less than
+   this amount, so don't be afraid to experiment to find your optimal setup. 
+
+
+4. Exit out of the SETUP.EXE program after you have made all of your choices.  
+
+
+After exiting out of the SETUP.EXE program, simply type DUNE2 to start the game.
+
+PLEASE REMEMBER that this is a beta version of the mixed sound support patch.
+We appreciate your comments regarding any mixed sound problems you may
+encounter.
+ 
+CREATIVE LABS WAVEBLASTER OWNERS:
+
+      As of 09/22/93 this patch has been updated to support Sound Blaster 16     
+      and Wave Blaster owners.  To receive mixed sound support (digitized  
+      sound from the SB16, and music from the Wave Blaster) do the following:
+
+      1.  Follow steps 1 - 3 as shown above.
+      
+      2.  In the SETUP program assign sound (music) option to 
+	  Sound Canvas (General MIDI), sound effect option to SBPRO, and 
+	  digitized option to SBPRO.
+	  
+      3.  After exiting SETUP.EXE, copy the files WAVESET.BAT and WAVESET.DAT
+	  to your DUNE II directory.
+
+      4.  Type WAVESET anytime you wish to play DUNE II in
+	  Wave Blaster/SB16 mode.         
+	 
+-Westwood Studios Audio Department-

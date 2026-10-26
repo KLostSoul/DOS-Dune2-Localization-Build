@@ -1,0 +1,30 @@
+# Root folders excluded from commits. The maintained project inputs are
+# doc/, font/, import/, and tools/.
+/archives/
+/build/
+/editor/
+/export/
+/img/
+/output/
+/temp/
+
+# Original CD images and related disc files
+*.bin
+*.ccd
+*.cue
+*.img
+*.iso
+*.sub
+
+# Original or third-party Dune II executables and PAK resources
+**/DUNE2.EXE
+**/*.PAK
+
+# Local emulator state, editor backups, caches, and temporary files
+/.emucap/
+**/sessions/
+**/__pycache__/
+*.py[cod]
+*.tmp
+*.lock
+*.log

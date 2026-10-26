@@ -1,0 +1,7 @@
+Dune II Speech Fix
+------------------
+
+If you're having trouble with digitized sounds when running Dune 2 from
+Windows, extract these files into your Dune II directory (original files will
+be overwritten). This should help fix the problem with sound lags and related
+game crashes.

@@ -1,0 +1,115 @@
+Dune II Gravis Ultrasound Patch
+-------------------------------
+Compiled by MrFlibble
+<mrflibble86@yahoo.com>
+
+23-02-2011
+
+------------------------------------------------------------------------------
+0. Liability disclaimer.
+------------------------------------------------------------------------------
+
+This is an unofficial patch, and I don't take any responsibility for possible
+damage that might occur from using it. Use it at your own risk. Westwood
+Studios, Electronic Arts, Petroglyph Games and/or whoever currently holds
+rights to Dune II do not provide any support for this patch.
+
+------------------------------------------------------------------------------
+1. General Information
+------------------------------------------------------------------------------
+
+This unofficial patch will enable Gravis Ultrasound support for Dune II (any
+version). It is primarily designed for DOSBox with Ultrasound emulation, and
+as such it was not tested with a real Gravis Ultrasound card. However, it is
+quite possible that it will work fine with the real deal.
+
+The inspiration for the current patch came from an earlier unofficial GUS
+patch for Dune II which dates back to 1993. That old patch, however, was
+designed for real GUS cards, and does not work well with DOSBox; besides, it
+completely disables Sound Blaster support, although DOSBox allows to use both
+SB and GUS simultaneously. The old patch can be obtained here:
+
+http://www.gravisultrasound.com/files/game_patches/DUNE2AIL.ZIP
+
+------------------------------------------------------------------------------
+2. Installation
+------------------------------------------------------------------------------
+
+NOTE: The following instructions assume that you already have DOSBox installed
+on your machine, and it is configured for proper Gravis Ultrasound emulation.
+If not, please refer to the information concerning Gravis Ultrasound emulation
+in DOSBox Wiki:
+
+http://dosbox.com/wiki/Sound#Gravis_Ultrasound
+
+For general information about DOSBox, visit their home page:
+http://dosbox.com/
+
+1) Back up the following files from your Dune II directory:
+
+   DUNE.CFG
+   SETUP.EXE
+   SETUPENG.DIP
+   SETUPFRE.DIP (if present)
+   SETUPGER.DIP (if present)
+   SOUND.PAK
+
+2) Unpack the archive d2_gus_patch.zip into your Dune II directory, and make
+   sure that the existing files are overwritten.
+
+   NOTE: If you have a three-language version of Dune II, use the setup
+   programme in the SETUP_EU folder, which will allow you to select between
+   English, French and German while configuring Dune II.
+
+3) For simplicity's sake, the patch comes with a Dune II configuration file
+   that is already set up to use Gravis Ultrasound for synthesized music,
+   sound effects and digital speech. If you do not want to change this
+   configuration, you can skip step 4) entirely.
+
+4) Run SETUP.EXE. Press 1 to answer the setup questions. The setup programme
+   will ask you to select the device for music, sound effects and digitized
+   voice playback (in that particular order). You will notice that the
+   numerical designations of certain devices are different from the original
+   Dune II setup programme.
+
+   a) For music, you should select option 6. Ultrasound (MIDI). Selecting
+      option 5. MT-32/LAPC-1 will produce the same effect as 6, but it is not
+      recommended to do so. Selecting either 2. Gravis Ultrasound or 3. Sound
+      Blaster Pro will use built-in digital synthesizers of the respective
+      sound cards that produce sound of much lower quality than the Ultrasound
+      MIDI synth. The option to select 8. Sound Canvas is also available.
+
+   b) For both sound effects and digitized speech, you can either select 2.
+      Gravis Ultrasound or 3. Sound Blaster Pro. Selecting different devices
+      for sound effects and digitized speech might produce unexpected results,
+      so do it at your own risk.
+
+   c) When the sound devices are configured, the setup programme will ask
+      whether you want to use extended memory and mouse, to which you should
+      answer Yes. Extended memory is required for digitized sounds playback,
+      an if it is disabled, there will be no speech, and sound effects will be
+      synthesized.
+
+5) Run DUNE2G.BAT. This will load the ULTRAMID synthesizer into memory and
+   launch Dune II. If everything is configured correctly, you will hear
+   high-quality synthesized music.
+
+   If you want to adjust music volume, open DUNE2G.BAT for editing. Find the
+   following line:
+
+   if not "%ultrasnd%"=="" %ultradir%\ultramid -16 -m115 -q
+
+   The -m key defines synthesized music volume, which ranges from 0 to 127.
+   Edit the value after the -m key to increase or decrease volume if you like.
+
+------------------------------------------------------------------------------
+3. Credits and thanks.
+------------------------------------------------------------------------------
+- the author of the original Dune II GUS patch that showed the principle of
+  how to enable Gravis Ultrasound support in Dune II.
+- Kevin Cernekee, author of the WWPak tool that was used to repackage Dune II
+  SOUND.PAK to include Gravis Ultrasound drivers.
+- Nyerguds, who hacked the three-language SETUP.EXE programme to enable
+  multiple sound device selection.
+- Siberian_GRemlin, author of the multi-functional Siberian String Table
+  Editor that I used to edit the Dune II setup programme text strings.

@@ -1,0 +1,7 @@
+﻿house_id,file,offset_hex,source_en,translation_ko,usage,editor_layout
+0,DUNE2.EXE,0x03C1E0,Harkonnen,하코넨,화면 표시용 이름; 원본 영문은 리소스 식별자로 보존,
+1,DUNE2.EXE,0x03C1F4,Atreides,아트레이데스,화면 표시용 이름; 원본 영문은 리소스 식별자로 보존,"{""house"":{""version"":1,""sha256"":""ee6d225cc64a2862b01340356ffea61df1de150dba59dd918d617116253c8e29"",""sizes"":[[6,0]]}}"
+2,DUNE2.EXE,0x03C207,Ordos,오르도스,화면 표시용 이름; 원본 영문은 리소스 식별자로 보존,
+3,DUNE2.EXE,0x03C217,Fremen,프레멘,화면 표시용 이름; 원본 영문은 리소스 식별자로 보존,
+4,DUNE2.EXE,0x03C22A,Sardaukar,사다우카,화면 표시용 이름; 원본 영문은 리소스 식별자로 보존,
+5,DUNE2.EXE,0x03C23E,Mercenary,용병,화면 표시용 이름; 원본 영문은 리소스 식별자로 보존,

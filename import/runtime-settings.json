@@ -1,0 +1,8 @@
+{
+  "description": "Default in-game configuration preserved from the confirmed final game. These are game settings, not emulator settings, and are not added to the CD image.",
+  "files": {
+    "DUNE.CFG": "b6a2a3a0a1a6a4a500b4",
+    "OPTIONS.CFG": "01000100040001000000",
+    "ONETIME.DAT": ""
+  }
+}

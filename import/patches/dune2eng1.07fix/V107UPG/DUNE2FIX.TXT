@@ -1,0 +1,174 @@
+                               Dune II v1.07 Fix
+                               -----------------
+                             Compiled by MrFlibble
+                              <dunefixed@mail.ru>
+
+                                   (19-09-11)
+ ษออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออป
+ บ                                 Disclaimer                               บ
+ ศออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออผ
+
+   This is an unofficial patch, and neither Westwood Studios nor its
+   successor, Electronic Arts, are related in any way to it, and thus they
+   will not provide any kind of support for it.
+
+   This patch is freeware, meaning that you may use and redistribute it
+   free of charge. However, you are using this patch at your own risk, and
+   I will not take any responsibility for whatever damage you can possibly
+   inflict to yourself or your PC by using (or misusing) it.
+
+ ษออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออป
+ บ                             1. Installation                              บ
+ ศออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออผ
+
+   In order to maintain compatibility with different known releases of
+   DUNE II, and to allow the installation of the patch on any OS, the
+   package contains the modified files to replace the original one from the
+   DUNE II installation.
+
+   The files for each known release are contained in a separate folder
+   within the archive:
+
+    DYNASTY - patched US release ("The Building of a Dynasty").
+    ARRAKIS - European three-language release ("The Battle for Arrakis").
+    HITSQUAD - HitSquad three-language release ("The Battle for Arrakis").
+
+   To ensure that you use the correct EXE version, check that the new
+   file's size (in bytes) matches the size of the original file. If none of
+   the executable files supplied in this package match your original
+   DUNE2.EXE in size, try using the HitSquad version of the fix.
+
+   NOTE: The patch is NOT compatible with DUNE II v1.0. Installing the
+   patch over v1.0 will result in game crashes. You must first update your
+   DUNE II to v1.07 using the official patch, and then install the fix's
+   files over it.
+
+ ษออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออป
+ บ                           2. Patch Information                           บ
+ ศออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออผ
+ 
+   Below is a complete list of issues the patch fixes in DUNE II v1.07.
+
+   Gameplay fixes:
+
+       Fixed the internal syntax error which prevented the AI from
+        assembling attack teams of light and heavy vehicles ("team bug").
+       Looped reinforcements for Sardaukar are now enabled.
+
+   Mission-specific fixes:
+
+       Removed the unused CHOAM (Starport related) section from SCENA001.
+       Removed obsolete reinforcement sections from SCENA002, SCENA003,
+        SCENA004 and SCENH004.
+       Fixed invalid spice bloom placement in SCENA005.
+       Removed junk lines (probably obsolete map data) from SCENH002 and
+        SCENH007.
+       Fixed incorrect hit point values for pre-placed buildings in
+        SCENH006.
+       Reinstated the sandworms that were commented out in SCENH008.
+       Fixed the error that disabled Devastator reinforcements in
+        SCENH017, SCENH018 and SCENH019.
+       Removed duplicate Spice Silo and Light Factory structures in
+        SCENO005 (two identical structures were positioned at the same
+        coordinates).
+       Increased the unit limit for the AI players to 25 in SCENO021.
+       Changed the player's starting credits from 1500 to 1000 in SCENO022
+        (the extra 500 credits were a result of an error).
+       Changed the Atreides WOR to Atreides Barracks in SCENH022,
+        SCENO014, SCENO015, SCENO016 and SCENO022, so that the Atreides can
+        produce infantry.
+       Fixed all missions where the MaxUnit value name was misspelled as
+        MaxUnits for an AI player (SCENA005, SCEN017, SCENA018, SCENA019,
+        SCENH017, SCENH018, SCENH019, SCENO017, SCENO018, SCENO019).
+       Fixed the error which prevented the player from buying
+        Ornithopters at the Starport in SCENA020, SCENA021, SCENA022,
+        SCENH020, SCENH021, SCEHNH022, SCENO020, SCENO021 and SCENO022.
+       Set the spice quota value to 0 in SCENA022, SCENH022 and SCENO022
+        (was 2500, but did not actually affect anything).
+
+   Mentat information fixes:
+
+       Fixed incorrect power consumption values for the Barracks and the
+        Starport (the incorrect values of 20 and 80 were changed to the
+        actual 10 and 50).
+       Light Factory entries in the Atreides and Ordos Mentat databases
+        are now accessible from mission 2 (since the Atreides and Ordos can
+        build Light Factories in this mission).
+       Spice Silos entry is no longer shown on mission 1.
+
+   In-game spelling fixes:
+
+       Fixed the spelling of the word "Ornithopter" (was "Ornithipter").
+       Fixed the spelling of the word "incompatible" (yes, I'm pedantic
+        ;)).
+       Fixed the spelling of the word "Starport" in the building hints
+        section.
+
+   Graphics fixes:
+
+       Fixed the House of Ix palette glitch for Atreides and Ordos.
+       Fixed a graphical glitch that would occur instead of the "manual 
+        check" sequence in the HitSquad release.
+
+   Sound fixes:
+
+       Removed the clicking noise from some of the game sound effects.
+       Restored a missing voice clip during missile launch countdown in
+        French and German (European and HitSquad releases).
+
+   Setup program changes:
+
+       The setup program now allows to configure multiple sound devices
+        for DUNE II (check SETSOUND.TXT for more information).
+       Several text mistakes in the setup dialogue were fixed, most
+        notably the music device selection screen, which no longer contains
+        the misleading line "Play sound from" (changed to "Play music
+        from").
+
+ ษออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออป
+ บ                           3. Acknowledgements                            บ
+ ศออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออผ
+
+   Dune II Unofficial Fix was made possible thanks to the efforts of these
+   people (in no particular order):
+
+       Kevin Cernekee, who created WWPAK, a very handy Westwood PAK
+        (un)packer.
+       Shagrath, author of an old Dune II Scenario Editor who was the
+        first to discover and describe the "team bug" in the game's AI
+        scripts.
+       Olaf van der Spek, author of the excellent XCC Mixer multi-purpose
+        tool.
+       Siberian_GRemlin, a Westwood Studios games enthusiast, who added
+        support for Dune II compressed text and Mentat database formats
+        into his Siberian String Table Editor at my request.
+       Nyerguds, creator of the C&C v1.06 patch, who started his Dune II
+        Editor project to help me out with Super Dune II, and put a lot of
+        effort into figuring out the intricacies of both the game's main
+        executable file and the setup programme.
+       TCH, author of a very handy Windows-based Dune II Scenario Editor.
+       Ultraq, who included Dune II SHP, CPS and WSA conversion tools into
+        his Red Horizon modding suite (primarily designed for Command &
+        Conquer: Red Alert) at my request.
+       ArrakisResearchCo, author of the Dune II Tile Viewer, which he
+        transformed into the Dune II Tile Editor at my request.
+       Segra, who did literally A LOT of research of Dune II code, which
+        he has released in the form of an IDA Pro database. With this
+        database, Dune II modding and editing has become a breeze :)
+       Minniatian, an expert in both PC and Amiga versions of Dune II.
+       Stefan Hendriks, creator of Arrakis and Dune 2 The Maker remakes of
+        Dune II, and a Dune II enthusiast in general :)
+       AnyKey Entertainment team, creators of an unofficial Russian
+        localization of Dune II.
+
+   I would also like to additionally thank Stefan Hendriks, Nema Fakei,
+   Nyerguds, Minniatian, Siberian_GRemlin, Segra and TrueBrain for lots of
+   support and valuable advice on numerous occasions. Thanks guys!!!  
+
+ ษออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออป
+ บ                          4. Contact Information                          บ
+ ศออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออผ
+
+   Feel free to send your comments and suggestions at dunefixed@mail.ru,
+   but don't forget to include "Dune II Fix" or something like that in the
+   mail title (so that I can distinguish your e-mails from spam :))
