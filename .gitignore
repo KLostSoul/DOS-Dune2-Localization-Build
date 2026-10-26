@@ -20,6 +20,9 @@
 **/DUNE2.EXE
 **/*.PAK
 
+# Imported patch packages are versioned build inputs.
+!/import/patches/**
+
 # Local emulator state, editor backups, caches, and temporary files
 /.emucap/
 **/sessions/

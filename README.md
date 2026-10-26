@@ -50,7 +50,7 @@
 | EXE 문자열 검토 CSV | `export/strings/executable_strings_review.csv` |
 | 게임 자체의 기본 설정 | `import/runtime-settings.json` |
 
-원본 CD와 Fix의 게임 파일, 커밋 제외된 보조 CSV·CG 기준 자료, 외부 빌드 도구는 로컬 빌드 환경에 별도로 준비해야 합니다.
+원본 CD와 커밋 제외된 보조 CSV·CG 기준 자료, 외부 빌드 도구는 로컬 빌드 환경에 별도로 준비해야 합니다. HitSquad 1.07 Fix 파일은 `import/patches/`에 포함합니다.
 
 ## 최종 빌드
 
@@ -98,7 +98,7 @@ python tools/edit_cg.py encode
 
 커밋 대상 폴더는 `doc/`, `font/`, `import/`, `tools/`입니다. 루트의 README·라이선스·`.gitignore`도 커밋 대상입니다.
 
-나머지 로컬 폴더와 에뮬레이터 기록은 커밋에서 제외합니다. 허용 폴더 안에서도 원본·제3자 `DUNE2.EXE`, PAK, CD 이미지와 캐시·임시 파일은 [.gitignore](.gitignore)의 제외 규칙을 따릅니다. 새 clone에는 커밋 제외 자료가 포함되지 않습니다.
+나머지 로컬 폴더와 에뮬레이터 기록은 커밋에서 제외합니다. 원본 CD·추출 게임 파일과 캐시·임시 파일은 [.gitignore](.gitignore)의 제외 규칙을 따릅니다. `import/patches/`의 패치 패키지는 빌드 입력이므로 EXE·PAK도 함께 커밋합니다. 새 clone에는 커밋 제외 자료가 포함되지 않습니다.
 
 `doc/`는 최종 빌드 상태·생성 과정·폰트·CG·런타임 패치·CD 패치 적용을 안내합니다. 전체 구성은 [문서 목차](doc/README.md), 도구별 명령과 검사 범위는 [도구 안내](tools/README.md)에서 찾습니다.
 
