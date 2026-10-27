@@ -15,6 +15,8 @@
 
 생성한 `DUNEHAN.FNT`, `DUNEUNI.FNT` 페이지와 `DUNEUNI.MAP`은 먼저 `import/fnt/`에 기록하고 그 바이트를 게임 폴더에 적용한다. 생성·적용 과정은 [BUILD](BUILD.md)에 있다.
 
+영상 글리프가 256개를 넘으면 `DUNEUN1.FNT`, `DUNEUN2.FNT` 순서로 페이지를 나눈다. 모든 페이지를 실행용 게임과 CD 이미지·Xdelta에 포함한다. 글리프가 줄면 더 이상 사용하지 않는 번호 페이지를 `import/fnt/`와 최종 게임 폴더에서 정리한다.
+
 ## 영구 문자표와 FNT 생성
 
 `import/fnt/glyph_registry.json` version 2의 `syllables` 배열이 전체 등록 한글의 저장 자료다. 현재 740음절을 한 문자표로 관리한다. CSV에서 발견한 새 음절은 성공한 최종 빌드가 문자표에 등록한다.

@@ -90,65 +90,133 @@ class BuildInputs(TranslationData):
             data = bodies[kind]; body += kind+len(data).to_bytes(4, 'big')+data+bytes(len(data)&1)
         return b'FORM'+len(body).to_bytes(4, 'big')+body, dict(records=len(records), expanded=max_expanded, stored=max_stored)
 
-def install_final_tree(source, destination, backup_root):
-    """Transactionally replace generated files in the stable final-build directory.
+class FileTransaction:
+    """Restore all generated inputs and products if any build step fails."""
 
-    Keep unrelated files (for example a user-added save) intact. If any file
-    replacement fails, restore every file already replaced in this operation.
-    """
+    def __init__(self, backup_root):
+        self.backup_root = backup_root.resolve()
+        self.originals = {}
+        self.created_directories = []
+        self.rollback_failed = False
+
+    def __enter__(self):
+        return self
+
+    def _target(self, path):
+        target = path.resolve()
+        if not target.is_relative_to(ROOT.resolve()):
+            raise ValueError(f'빌드 반영 경로가 프로젝트 밖입니다: {path}')
+        return target
+
+    def _parent(self, target):
+        missing = []
+        parent = target.parent
+        while not parent.exists():
+            missing.append(parent)
+            parent = parent.parent
+        for directory in reversed(missing):
+            directory.mkdir()
+            self.created_directories.append(directory)
+
+    def _remember(self, target):
+        if target in self.originals:
+            return
+        backup = None
+        if target.exists():
+            if not target.is_file():
+                raise ValueError(f'빌드 출력 대상이 파일이 아닙니다: {target}')
+            backup = self.backup_root/str(len(self.originals))
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(target, backup)
+        self.originals[target] = backup
+
+    def replace(self, source, target):
+        target = self._target(target)
+        self._parent(target)
+        self._remember(target)
+        handle = tempfile.NamedTemporaryFile(dir=target.parent, prefix=target.name+'.',
+                                             suffix='.publish.tmp', delete=False)
+        temporary = Path(handle.name)
+        handle.close()
+        try:
+            shutil.copyfile(source, temporary)
+            os.replace(temporary, target)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    def write(self, target, data):
+        self.backup_root.mkdir(parents=True, exist_ok=True)
+        handle = tempfile.NamedTemporaryFile(dir=self.backup_root, delete=False)
+        source = Path(handle.name)
+        try:
+            with handle:
+                handle.write(data)
+            self.replace(source, target)
+        finally:
+            source.unlink(missing_ok=True)
+
+    def remove(self, target):
+        target = self._target(target)
+        if target.exists():
+            self._remember(target)
+            target.unlink()
+
+    def __exit__(self, kind, error, traceback):
+        if kind is None:
+            return False
+        failures = []
+        for target, backup in reversed(self.originals.items()):
+            try:
+                if backup is None:
+                    target.unlink(missing_ok=True)
+                else:
+                    os.replace(backup, target)
+            except OSError as failure:
+                failures.append(f'{target}: {failure}')
+        for directory in reversed(self.created_directories):
+            try:
+                directory.rmdir()
+            except OSError:
+                pass
+        if failures:
+            self.rollback_failed = True
+            raise RuntimeError('빌드 복구에 실패했습니다. 복구 자료: '+str(self.backup_root)+
+                               '\n'+'\n'.join(failures)) from error
+        return False
+
+
+def install_final_tree(source, destination, transaction):
+    """Install generated files while preserving unrelated files such as saves."""
     source = source.resolve()
     destination = destination.resolve()
-    backup_root = backup_root.resolve()
     if not destination.is_relative_to((ROOT/'build').resolve()):
         raise ValueError('최종 빌드 경로가 build/ 밖을 가리킵니다.')
-    destination.mkdir(parents=True, exist_ok=True)
-    changed = []
-    try:
-        for item in source.rglob('*'):
-            relative = item.relative_to(source)
-            if relative.parts[0] in {'assembly', 'translation-snapshot', 'output'}:
-                continue
-            target = destination/relative
-            if not target.resolve().is_relative_to(destination):
-                raise ValueError(f'최종 빌드 내부의 링크가 경로를 벗어납니다: {target}')
-            if item.is_dir():
-                target.mkdir(parents=True, exist_ok=True)
-                continue
-            target.parent.mkdir(parents=True, exist_ok=True)
-            backup = None
-            if target.is_file():
-                backup = backup_root/relative
-                backup.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(target, backup)
-            temporary = target.with_name(target.name+'.publish.tmp')
-            try:
-                shutil.copyfile(item, temporary)
-                os.replace(temporary, target)
-            finally:
-                if temporary.exists():
-                    temporary.unlink()
-            changed.append((target, backup))
-    except Exception:
-        for target, backup in reversed(changed):
-            if backup is None:
-                if target.exists():
-                    target.unlink()
-            else:
-                temporary = target.with_name(target.name+'.restore.tmp')
-                shutil.copy2(backup, temporary)
-                os.replace(temporary, target)
-        raise
+    game_relative = Path('source/VIRGIN/DUNE2')
+    for old_page in (destination/game_relative).glob('DUNEUN*.FNT'):
+        if re.fullmatch(r'DUNEUN[1-9][0-9]*\.FNT', old_page.name) and not (source/game_relative/old_page.name).exists():
+            transaction.remove(old_page)
+    for item in source.rglob('*'):
+        relative = item.relative_to(source)
+        if relative.parts[0] in {'assembly', 'translation-snapshot', 'output'} or item.is_dir():
+            continue
+        target = destination/relative
+        if not target.resolve().is_relative_to(destination):
+            raise ValueError(f'최종 빌드 내부의 링크가 경로를 벗어납니다: {target}')
+        transaction.replace(item, target)
 
 def build(self, *, publish=True, original_files=None):
     temp_root = ROOT/'temp'
     temp_root.mkdir(parents=True, exist_ok=True)
     stage_root = Path(tempfile.mkdtemp(prefix='final-build-', dir=temp_root))
+    transaction = FileTransaction(stage_root/'rollback')
     try:
-        result = _build_with_stage(self, publish=publish, stage_root=stage_root, original_files=original_files)
+        with transaction:
+            result = _build_with_stage(self, publish=publish, stage_root=stage_root,
+                                      transaction=transaction, original_files=original_files)
     finally:
         # Remove only this invocation's dedicated intermediate directory.
         # Remove this build's scratch data and the temp/ root when it is empty.
-        if stage_root.exists():
+        if stage_root.exists() and not transaction.rollback_failed:
             if stage_root.resolve().parent != temp_root.resolve():
                 raise RuntimeError(f'빌드 임시 경로가 temp/ 밖으로 이동했습니다: {stage_root}')
             shutil.rmtree(stage_root)
@@ -163,7 +231,7 @@ def build(self, *, publish=True, original_files=None):
                       message='검토 빌드를 생성했고 temp 작업 자료를 정리했습니다. 최종 빌드에는 게시하지 않았습니다.')
     return result
 
-def _build_with_stage(self, *, publish, stage_root, original_files=None):
+def _build_with_stage(self, *, publish, stage_root, transaction, original_files=None):
     self.unchanged_on_disk()
     changed = [row for row in self.rows if editable(row)]
     self.prepare_syllables()
@@ -271,10 +339,12 @@ def _build_with_stage(self, *, publish, stage_root, original_files=None):
         # exact bytes to the new game tree.
         generated_fonts = {'DUNEHAN.FNT': font, **unifont['files']}
         font_import = ROOT/'import/fnt'
-        font_import.mkdir(parents=True, exist_ok=True)
+        for old_page in font_import.glob('DUNEUN*.FNT'):
+            if re.fullmatch(r'DUNEUN[1-9][0-9]*\.FNT', old_page.name) and old_page.name not in generated_fonts:
+                transaction.remove(old_page)
         for name, data in generated_fonts.items():
             imported = font_import/name
-            imported.write_bytes(data)
+            transaction.write(imported, data)
             applied = imported.read_bytes()
             if applied != data:
                 raise ValueError(f'생성 폰트와 import/fnt 파일이 다릅니다: {name}')
@@ -341,21 +411,16 @@ def _build_with_stage(self, *, publish, stage_root, original_files=None):
     self.unchanged_on_disk()
     if publish:
         stable_out = build_root/'final-build'
-        install_final_tree(fixed_out, stable_out, stage_root/'rollback')
+        install_final_tree(fixed_out, stable_out, transaction)
         # Publish the installed game location rather than the staging path,
         # which is deleted when this build finishes.
         cd_manifest['game_dir'] = str((stable_out/'source/VIRGIN/DUNE2').resolve())
         (staged_output/clonecd_xdelta.MANIFEST.name).write_text(
             json.dumps(cd_manifest, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
         output_dir = ROOT/'output'
-        output_dir.mkdir(exist_ok=True)
         for path in staged_output.iterdir():
-            temporary = output_dir/(path.name+'.tmp')
-            shutil.copyfile(path, temporary)
-            os.replace(temporary, output_dir/path.name)
-        registry_temp = REGISTRY.with_suffix('.json.tmp')
-        registry_temp.write_bytes(registry_bytes(self.syllables))
-        os.replace(registry_temp, REGISTRY)
+            transaction.replace(path, output_dir/path.name)
+        transaction.write(REGISTRY, registry_bytes(self.syllables))
         fixed_out = stable_out
     else:
         output_dir = staged_output

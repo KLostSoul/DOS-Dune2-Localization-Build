@@ -64,8 +64,8 @@ python tools/check_final_build.py
 
 | 영역 | 검사 대상 |
 |---|---|
-| `package` | BIN 내부 파일, EDC/ECC, CUE, Xdelta 복원 결과 |
-| `structure` | EXE·MZ 재배치·메모리 경계·HitSquad 패치 |
+| `package` | 번역 입력에 필요한 모든 FNT 페이지와 BIN 내부 파일, EDC/ECC, CUE, Xdelta 복원 결과 |
+| `structure` | EXE·MZ 재배치·메모리 경계·HitSquad 패치·저장 실패 시 일괄 복구 |
 | `hangul` | 한글 토큰·글리프·폭·단축키 |
 | `latin` | 영문·숫자·부호와 서식 |
 | `unifont` | 영상 글리프·XMS 적재와 해제 |

@@ -13,6 +13,7 @@ import hashlib
 import itertools
 import json
 import math
+import os
 import re
 import shutil
 import struct
@@ -163,7 +164,13 @@ def check_package(folder):
     files = iso_contents(image)
     expected = dict(original_files())
     prefix = 'VIRGIN/DUNE2/'
-    for name in clonecd_xdelta.NEW_FILES:
+    # Derive required pages independently from the translation inputs, rather
+    # than trusting the CD writer's own file selection or the manifest.
+    inputs = model.BuildInputs()
+    intro = font_tools.intro_build([row for row in inputs.rows if translation_data.editable(row)],
+                                  inputs.syllables, ROOT)
+    required = set(clonecd_xdelta.NEW_FILES) | set(intro['files'])
+    for name in required:
         expected[prefix+name] = (game/name).read_bytes()
     assert set(files) == set(expected), 'Unexpected/missing ISO files (including possible saves)'
     for path in expected:
@@ -208,6 +215,75 @@ def check_package(folder):
                 all_iso_files_match_final_or_original=True, no_save_files_added=True,
                 cue_matches_bin=True, xdelta_applied_to_original_matches_bin=True,
                 bin_sha256=manifest['target_bin_sha256'], xdelta_sha256=digest(clonecd_xdelta.PATCH))
+
+
+def check_publish_transaction():
+    """Inject a failure at each font/game/package/registry replacement."""
+    from unittest.mock import patch
+
+    cases = 0
+    for fail_at in range(1, 9):
+        with scratch() as fixture, patch.object(model, 'ROOT', fixture):
+            game = fixture/'build/final-build/source/VIRGIN/DUNE2'
+            font = fixture/'import/fnt'
+            output = fixture/'output'
+            registry = font/'glyph_registry.json'
+            old = {game/'DUNE2.EXE': b'old-exe', game/'DUNEHAN.FNT': b'old-font',
+                   game/'DUNEUN1.FNT': b'old-page', game/'_SAVE000.DAT': b'user-save',
+                   font/'DUNEHAN.FNT': b'old-font', font/'DUNEUNI.MAP': b'old-map',
+                   font/'DUNEUN1.FNT': b'old-page', registry: b'old-registry',
+                   output/'game.bin': b'old-bin', output/'game.xdelta': b'old-patch'}
+            for path, data in old.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+            stage = fixture/'stage'
+            for path, data in {stage/GAME/'DUNE2.EXE': b'new-exe',
+                               stage/GAME/'DUNEHAN.FNT': b'new-font',
+                               stage/'output/game.bin': b'new-bin',
+                               stage/'output/game.xdelta': b'new-patch'}.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+            before = {str(path): digest(path) for folder in (fixture/'build', fixture/'import', output)
+                      for path in folder.rglob('*') if path.is_file()}
+            count = 0
+            replace = os.replace
+
+            def fail_once(source, target):
+                nonlocal count
+                if str(source).endswith('.publish.tmp'):
+                    count += 1
+                    if count == fail_at:
+                        raise OSError('injected build publication failure')
+                return replace(source, target)
+
+            failed = False
+            with patch.object(model.os, 'replace', fail_once):
+                try:
+                    with model.FileTransaction(fixture/'rollback') as transaction:
+                        transaction.remove(font/'DUNEUN1.FNT')
+                        transaction.write(font/'DUNEHAN.FNT', b'new-font')
+                        transaction.write(font/'DUNEUNI.MAP', b'new-map')
+                        model.install_final_tree(stage, fixture/'build/final-build', transaction)
+                        transaction.replace(stage/'output/game.bin', output/'game.bin')
+                        transaction.replace(stage/'output/game.xdelta', output/'game.xdelta')
+                        transaction.write(registry, b'new-registry')
+                except OSError as error:
+                    assert str(error) == 'injected build publication failure'
+                    failed = True
+            after = {str(path): digest(path) for folder in (fixture/'build', fixture/'import', output)
+                     for path in folder.rglob('*') if path.is_file()}
+            if fail_at <= 7:
+                assert failed and after == before, (fail_at, before, after)
+                cases += 1
+            else:
+                assert not failed and count == 7
+                assert (game/'DUNE2.EXE').read_bytes() == b'new-exe'
+                assert registry.read_bytes() == b'new-registry'
+                assert not (game/'DUNEUN1.FNT').exists() and not (font/'DUNEUN1.FNT').exists()
+            assert (game/'_SAVE000.DAT').read_bytes() == b'user-save'
+            assert not list(fixture.rglob('*.publish.tmp'))
+    return dict(failure_points_restored=cases, font_game_package_registry_rolled_back=True,
+                save_preserved=True, obsolete_font_pages_removed_on_success=True)
 
 
 def check_structure(folder):
@@ -264,7 +340,8 @@ def check_structure(folder):
     for seg, off, size in ((0x32B8, 0xDE3, 6), (0x32DD, 0x1581, 1)):
         a, b = module_at(exe, seg)+off, module_at(original, seg)+off
         assert exe[a:a+size] == original[b:b+size]
-    return dict(mz_relocations=count, resident_end=end, font_end=cheat_at,
+    return dict(publish_transaction=check_publish_transaction(),
+                mz_relocations=count, resident_end=end, font_end=cheat_at,
                 cheat_bytes=extra['cheat_module_bytes'],
                 stack_segment=extra['new_stack_segment'], runtime_checks=checks,
                 jwasm_compilations=len(compiler['compilations']),

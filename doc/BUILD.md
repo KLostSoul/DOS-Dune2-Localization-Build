@@ -77,6 +77,8 @@ python tools/cd_source.py extract --output "build/original-inspection" --unpack-
 
 `DUNEHAN.FNT`와 유니폰트 FNT/MAP은 먼저 `import/fnt/`에 생성한 바이트를 게임 폴더에 적용한다. 게임의 `DUNEHAN.TBL`과 빌드의 `DUNEHAN.TBL.csv`에는 현재 전체 문자표를 기록한다.
 
+생성 폰트·게임 파일·CD 배포물·등록 문자표는 같은 복구 범위에서 반영한다. 생성이나 저장 중 오류가 나면 교체한 파일을 빌드 전 상태로 복원한다. 복원 자체가 실패한 경우에는 오류 메시지에 복구 자료 경로를 표시하고 해당 임시 자료를 유지한다. 사용자 세이브 등 생성 대상이 아닌 파일은 보존한다.
+
 조립·CG 인코딩·CD 구성 중간 자료는 `temp/`에만 생성한다. 종료 시 해당 빌드의 임시 자료를 삭제하고 `temp/`가 비었으면 폴더도 제거한다. `build/final-build/`에는 중간 자료와 중복 배포 폴더를 두지 않는다. 게임 자체의 CFG 기본값은 `import/runtime-settings.json`에서 적용하고, CD에는 원본 `DUNE.CFG`를 유지하며 세이브 파일을 추가하지 않는다.
 
 ## 고정 코드 패치와 HitSquad Fix

@@ -12,6 +12,7 @@ import argparse
 import hashlib
 import json
 import math
+import re
 import struct
 import subprocess
 from pathlib import Path
@@ -32,6 +33,18 @@ NEW_FILES = (
     "SETSOUND.TXT", "WAVESET.BAT", "WAVESET.DAT",
 )
 SKIP_EXISTING = {"DUNE.CFG"}  # Local sound/setup choices belong to the owner.
+
+
+def additional_game_files(game_dir: Path) -> tuple[str, ...]:
+    """Include every generated native Unifont page in numeric order."""
+    pages = {}
+    for path in game_dir.glob('DUNEUN*.FNT'):
+        match = re.fullmatch(r'DUNEUN([1-9][0-9]*)\.FNT', path.name)
+        if match:
+            pages[int(match[1])] = path.name
+    if sorted(pages) != list(range(1, len(pages)+1)):
+        raise ValueError('Unifont page sequence has a missing file.')
+    return NEW_FILES + tuple(pages[index] for index in sorted(pages))
 
 
 def sha256(data: bytes | bytearray | Path) -> str:
@@ -215,7 +228,7 @@ def build_image(original: Path, game_dir: Path, output: Path) -> dict:
                         "new_size": len(data), "extent": new_extent,
                         "sha256": sha256(data)})
 
-    for name in NEW_FILES:
+    for name in additional_game_files(game_dir):
         assert name not in records
         source = game_dir / name
         assert source.is_file(), f"Missing additional build file: {source}"
