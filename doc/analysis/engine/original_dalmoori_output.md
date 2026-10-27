@@ -1,19 +1,4 @@
-> 분석·수정 이력입니다. 빌드명·해시와 당시의 “현재 후보”·“확인 전”은 해당 절 작성 시점의 기록입니다. 최신 실행본·적용 기능·사용자 확인은 [현재 상태](../../STATUS.md)를 따릅니다.
-
-# 원본과 달무리 639음절 수정판의 출력 경로 대조
-
-> 2026-10-22 후속 정정: 기존 후보의 멘타트 IFF 재포장에서 NAME 패딩과 DESC 청크 크기를 보존하지 않은 결함을 확인했다. 원본 IFF 명령의 제한 실행으로 폐기 후보의 DESC/INFO 읽기 실패와 새 파일의 정상 청크 읽기를 대조했다. 폭 후크만으로 모든 정지를 설명했던 판단은 근거가 부족했다. 자세한 재작성·검증 기록은 [원본 출력 구조 보존 재작성](native_output_rebuild.md)을 참조한다. 아래 후보의 현재 보관 위치는 `build/discarded/dalmuri639-wrapfix`다.
-
-작성일: 2026-10-21. 이번 기록은 정적 분석이다. 게임을 실행하거나 실행 파일을 수정하지 않았다.
-
-## 대상과 사용자 관측
-
-| 대상 | 파일 | SHA-256 |
-|---|---|---|
-| 원본 | `build/source/VIRGIN/DUNE2/DUNE2.EXE` | `99f44e83b309dd826f3dbc5068c61679bb68047eed8d738dcef594ba0eef7552` |
-| 현재 수정판 | `build/dalmuri639-wrapfix/korean/source/VIRGIN/DUNE2/DUNE2.EXE` | `b1cdad13ee4dfb88f5ecaf71930f28036247509082d3d822cc4ca1c81397e929` |
-
-사용자는 메뉴의 정상 표시를 확인했다. 가문 문장을 선택한 직후, 설명 텍스트가 한 글자도 표시되기 전에 멈춘다고 설명했다. 역방향 폭 조회 수정판에서도 같은 멈춤이 남는다고 보고했다. **기존 역방향 반복 결함을 고쳤다는 사실과 실제 멈춤이 해결됐다는 판단은 별개다. 현재 멈춤의 실제 CS:IP는 아직 수집하지 않았다.**
+# 원본 출력기와 한글 토큰 처리의 인터페이스 비교
 
 ## REA로 확인한 차이
 
@@ -56,7 +41,7 @@ REA의 Ghidra 12.1.4 DOS MZ 분석을 사용했다. 아래 원본 주소는 파�
 
 세 가문 × 원본/한글 × 간격 세 가지, 총 18개 입력에서 모두 함수가 반환했다. 따라서 **현재 수정판이 이 선언된 입력에서도 같은 역방향 반복에 빠진다고 설명하는 것은 맞지 않는다.** 실제 게임의 호출 인자·세그먼트·FNT 포인터가 이 조건과 같은지는 디버거로 확인해야 한다.
 
-현재 반복 수정 후에도 사용자 멈춤이 남는다는 관측과 이 결과를 함께 보존한다. 이전의 역방향 반복 설명만으로 현재 멈춤이 특정됐다는 판단은 철회한다.
+역방향 폭 반복의 종료 여부와 멘타트 항목 읽기의 정지는 서로 다른 경로다. 폭 루프의 결함만으로 리소스 읽기 정지까지 특정할 수 없다. NAME·DESC·INFO 경계도 함께 검사한다.
 
 ## 서식 바이트와 글리프 바이트의 접점
 
@@ -69,90 +54,3 @@ REA의 Ghidra 12.1.4 DOS MZ 분석을 사용했다. 아래 원본 주소는 파�
 추출 원본 경로·파일 오프셋·길이·해시는 `build/analysis/dalmuri-original-vs-korean/derived-artifacts.json`에 있다. 분석용 선형 11893h는 원본 모듈의 `32DD:1893` 코드에 해당한다. 이 분석용 컨테이너의 외부 FAR 호출은 원래 FBOV 선택값을 그대로 갖기 때문에, 컨테이너의 자동 외부 호출 이름을 게임의 실제 호출 대상으로 간주하지 않았다.
 
 Ghidra의 일부 세그먼트 MOV 피연산자 방향 표기와 자동 함수 경계는 불완전했다. 실제 바이트·Capstone과 교차 대조했으며, 코드 주소를 잘못 요청해 인접 함수가 반환된 결과는 해당 함수의 근거로 사용하지 않았다.
-
-## 근거 파일
-
-`build/analysis/dalmuri-original-vs-korean/` 아래에 저장했다.
-
-- `comparison.json`: 파일 해시, 함수별 바이트 차이, 세 문장 해제 결과.
-- `TEXT*.ENG.original-runtime.bin`, `TEXT*.ENG.korean-runtime.bin`: 해제 결과 바이트.
-- `splitter-instruction-evaluation.json`: 선언된 조건과 18개 명령 평가 결과.
-- `original-rea.json`, `original-string-lookup-rea.json`, `current-rea.json`: 원본·수정판 상주 코드 근거.
-- `overlay-rea.json`, `overlay-rea-extended.json`: 문장 분할 및 표시 코드 근거.
-- `original-graphics-rea.json`: 원본 픽셀 및 페이지 조회 코드 근거.
-
-주요 REA 근거 ID:
-
-- 원본 폭 함수: `ev_942e8634fab7dad112a508d77495015144f54bd54f5967bbc9b5e172f91017b1`
-- 수정판 폭 함수: `ev_e753cbb395f6c572f3774c27b233511cd63726a1886e522a7b31937041306f0b`
-- 원본 일반 줄바꿈: `ev_7fee539b852b505ab273ae7300084dcddb3ce5f94bd70d00e3df6b4f352e93b2`
-- 수정판 일반 줄바꿈: `ev_67d9e47fd0032261eb5ccd9cfef778bad300fccdbac25aea9c7b120fb6a8ae0a`
-- 설명문 분할: `ev_7c26df78844e323e5e7d55ed9e75de180d9ecf7b7b885711b78a24c6d1650cf6`
-- 설명문 표시 준비: `ev_21f532a4149ba62822095f458f8ddb37cf99dae59a46ae5c455503ff8c8c443b`
-- 줄 단위 표시: `ev_35d8f9385cf00a31cdd00578b9d8da494e3b0ec139e62751617159f525d69c89`
-- 원본 페이지 조회: `ev_195e00e2e442ddbfbffbdd0692937b1bb083ce41439208ee092d93396b2ac14c`
-
-## 다음 디버그에서 수집할 값
-
-사용자가 디버그 확인을 지시했으며, 이 문서를 먼저 기록하라고 요청했다. 아래 런타임 실측 업데이트는 이 계획 뒤에 수행한 실제 관측을 기록한다.
-
-1. 실제 실행 파일 해시와 DOSBox-X 설정·적재 기준.
-2. 가문 선택 전후 CS:IP, SS:SP/BP, DS/ES.
-3. 설명문 읽기·해제 후 실제 버퍼 주소와 바이트.
-4. 두 줄바꿈 함수의 실제 진입 인자, 활성 FNT 폭 포인터, 반환 여부.
-5. 최초 설명문 출력 호출 도달 여부와 멈춤 시 반복되는 명령.
-
-실행 관측 전에는 현재 멈춤 원인을 확정하거나 해결됐다고 기록하지 않는다.
-
-## DOSBox-X 런타임 실측 업데이트 — 2026-10-21
-
-대상 실행 파일은 `build/dalmuri639-wrapfix/korean/source/VIRGIN/DUNE2/DUNE2.EXE`이며 SHA-256은 `b1cdad13ee4dfb88f5ecaf71930f28036247509082d3d822cc4ca1c81397e929`이다. 기존 설치 DOSBox-X(`C:\DOSBox-X\dosbox-x.exe`)와 emucap 외부 디버거 브리지를 사용했고, emucap이 실행 세대별 게임 디렉터리를 복사했다. 원본 작업 파일을 직접 수정하지 않았다.
-
-### 실행·부팅 관측
-
-- 첫 세대 `launch-01m5ep2vc3g52apgd3bhg6vwgv`는 BIOS 리셋 벡터에서 `start_frozen=true`로 연결됐다. `step`을 120프레임 진행한 뒤 브리지와 DOSBox-X 프로세스가 모두 종료됐다. 실패 컨텍스트에는 어댑터 내부 오류가 남지 않아 종료 원인은 확정할 수 없다.
-- 두 번째 세대 `launch-01m5epc688bx2febmeje1hqyg7`에서는 CPU 명령 단위 `step` 1회가 성공했다. 이후 120프레임 입력 탭이 BIOS 부팅을 진행하고 Westwood 로고, 한글 메인 메뉴, 가문 선택 화면까지 도달했다. 프레임 단위 `step` 실패와 `tap` 기반 프레임 진행은 구분한다.
-- 한글 메인 메뉴는 프레임 486에서 관측했고, 가문 선택 화면은 프레임 639에서 관측했다.
-
-### Ordos 경로 관측 — Atreides 멈춤 재현이 아님
-
-- 가문 화면에서 `1`과 `a` 입력은 선택을 바꾸지 않았다. 가운데 포인터 위치의 `mouse_left` 입력도 화면을 넘기지 않았다.
-- 기본 Enter 경로에서 Ordos 화면으로 진행했다. Ordos 인물·행성 화면은 프레임 768, 951에서 프로세스가 살아 있는 상태로 표시됐다. 프레임 983의 Enter 탭 직후 캡처에는 상단 한글 설명 한 줄이 나타났고, 프레임 1104의 무입력 진행 후에는 해당 문장이 보이지 않았다.
-- 이 관측은 화면 전환·입력 대기 여부를 더 확인할 근거일 뿐이다. Atreides 선택 후 설명문 직전의 멈춤이 재현되었다고 보거나, 현재 결함 원인을 특정했다고 볼 수 없다.
-
-### 현재 디버그 입력 제약
-
-세 번째 세대 `launch-01m5epx0bg4st0sej25chr7s1p`는 프레임 855의 가문 선택 화면에서 디버거가 정지해 있다. 상대 포인터 이동은 `DOSBox-X window desktop Default differs from input desktop Screen-saver` 오류로 거절됐다. 이 입력 데스크톱 상태 때문에 Atreides 항목을 선택하지 못했다. 현재 세션의 실제 게임 CPU 정지·오류 주소는 아직 확보되지 않았다.
-
-현재 정지 화면은 `build/analysis/dalmuri639-runtime-debug/atreides-selection-frozen.png`에 저장했다. DOSBox-X 캡처 메타데이터 SHA-256은 `1d584b371c463ece354810c1644215b3ca0a2590ce145492a6c7d086f66857ce`이고 크기는 320×200, 프레임은 855다.
-
-## DOSBox-X 런타임 대조 재개 — Atreides 설명문 입력 대기 확인
-
-2026-10-21. 사용자가 화면 보호기를 해제한 뒤 창 표시 실행을 재시도했다. 한 차례 DOSBox-X가 Windows 오류 `0xC0000409`로 종료됐고, 같은 설정의 재시도는 연결됐다. Windows Application Error 이벤트의 PID는 실패한 실행 프로세스와 일치했다. 정상 비교는 두 실행 파일을 각각 `display=true`로 띄우고 상대 포인터 입력을 사용했다.
-
-| 대상 | 실행 ID | 실행 파일 SHA-256 |
-|---|---|---|
-| 원본 | `launch-01m5est6wgs7cs03n485hj294c` | `99f44e83b309dd826f3dbc5068c61679bb68047eed8d738dcef594ba0eef7552` |
-| 한글 수정판 | `launch-01m5eshe8xcf00bn5s3hcx5py9` | `b1cdad13ee4dfb88f5ecaf71930f28036247509082d3d822cc4ca1c81397e929` |
-
-두 실행 모두 같은 하우스 선택 화면 프레임 968에 도달했다. 포인터를 `(160,100)`에서 `(-100,+38)` 상대 이동해 `(60,138)`에 두고 왼쪽 버튼을 2프레임 눌렀다. 원본은 선택 전환이 늦어 클릭 후 210프레임에 Atreides 카드 제목이 보였고, 한글판은 클릭 후 150프레임에 같은 카드 제목이 보였다. 전환 중 검은 화면은 이후 프레임 진행에서 Atreides 카드 화면으로 바뀌었다.
-
-두 빌드에서 Atreides 카드 제목이 표시된 상태는 **설명문이 아직 없는 입력 대기 화면**이었다. 이 상태에서 Enter를 1프레임 입력하고 30프레임 진행하자 다음 결과가 나왔다.
-
-| 실행 파일 | Enter 전 | Enter 후 |
-|---|---|---|
-| 원본 | `House Atreides` 제목과 CG, 본문 없음. 프레임 1187, CPU `CS:IP=2D7E:04E0`, PC `0x2DCC0` | `Caladan, home planet of the Atreides, has a warm, calm climate and the lands are lush and green.` 표시. 프레임 1218, `CS:IP=2F2C:0533`, PC `0x2F7F3` |
-| 한글 수정판 | `아트레이아스 가문` 제목과 CG, 본문 없음. 프레임 1218, `CS:IP=0C6F:075B`, PC `0x0CEDB` | `아트레이아스의 고향 행성 칼라단은 온화하고 평온한 기후와 비옥한 땅을 자랑합니다.` 표시. 프레임 1249, `CS:IP=3010:0494`, PC `0x30594` |
-
-두 화면 모두 Enter 뒤 설명문이 나타났으며, Enter 없이 대기한 한글판도 추가 120프레임 동안 화면과 본문 부재 상태를 유지했다. 설명문 표시 뒤에는 원본과 한글판 모두 120프레임 무입력 상태에서 본문이 계속 보였다. 한글판 본문은 프레임 1370까지 유지됐다. 따라서 이 Atreides 카드 경로에서 사용자가 본 “설명문 전에 멈춤”은 원본과 같은 **카드 화면의 Enter 대기**로 재현된다. 한글판은 Enter를 받은 뒤 실제 한글 설명문 출력 경로에 진입한다. 앞서 작성한 역방향 줄바꿈 무한 반복 결함이 이 화면의 입력 대기 원인이라는 증거는 얻지 못했다.
-
-이 관측은 이 카드 화면의 동작을 확정하지만, 사용자가 별도로 보여준 `Do you wish to join House Atreides? / Yes / No` 그림 프롬프트가 실제 클릭 시 표시됐는지는 이번 캡처에서 확인하지 못했다. 해당 프롬프트와 카드의 Enter 대기를 같은 화면으로 취급하지 않는다.
-
-### 저장 캡처
-
-- 한글 Atreides 카드: `build/analysis/dalmuri639-runtime-debug/korean-atreides-card-after-120.png`, 프레임 1218, SHA-256 `5bacd5df0a6ae8e3f33233d17e6729fe478099a70bde63615cd679975d22f457`
-- 한글 설명문: `build/analysis/dalmuri639-runtime-debug/korean-description-after-enter.png`, 프레임 1249, SHA-256 `ccfa7c34aa2ed87df253100a4f0467a5d3101f369ed50c6efea9beb5daf072f9`
-- 한글 설명문 무입력 유지: `build/analysis/dalmuri639-runtime-debug/korean-description-after-120-idle.png`, 프레임 1370, SHA-256 `eafcc4ae87c328b27a266784754cbce44d36dbb7ff9e0720c92a372092bed296`
-- 원본 Atreides 카드: `build/analysis/dalmuri639-runtime-debug/original-after-atreides-click-wait-210.png`, 프레임 1187, SHA-256 `af4ab159857faeaaadfc39e0b994045b3441cb221a1f7b013bb804603d914c9c`
-- 원본 설명문: `build/analysis/dalmuri639-runtime-debug/original-description-after-enter.png`, 프레임 1218, SHA-256 `0181bdad2464b6bb1621b35ca67ff4725dc657187638972c421b58c510be5a46`
-- 원본 설명문 무입력 유지: `build/analysis/dalmuri639-runtime-debug/original-description-after-120-idle.png`, 프레임 1339, SHA-256 `e3a225280e0eba33e5f29b33ac8bc717f35fec8646299a3cbbe5491bda88ec76`

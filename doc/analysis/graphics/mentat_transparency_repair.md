@@ -1,7 +1,9 @@
-## MENTAT.ENG 버튼 PNG의 투명색 설정 복원 — 2026-10-25
+# MENTAT.ENG 버튼의 투명색 메타데이터
 
-편집 PNG `images/ENGLISH/MENTAT.ENG/frame_000.png`의 팔레트는 원본과 같았지만 투명색 메타데이터가 없어 `transparency index changed` 오류가 났다. 사용자가 공급한 `frame_000.png`부터 `frame_009.png`까지 열 장은 보관된 MENTAT.ENG 원본 프레임과 팔레트·픽셀 번호·투명색 0번 설정이 같았다.
+MENTAT.ENG 버튼 프레임은 팔레트 색 번호와 투명색 0번 설정을 함께 사용한다. 픽셀·팔레트가 그대로여도 PNG의 투명색 메타데이터가 빠지면 `transparency index changed` 검사가 실패한다.
 
-편집본 0~9번 열 장에 원본의 투명색 0번 설정을 복원했다. 한글 편집 픽셀 번호, 팔레트, 크기는 전부 그대로다. 공급되지 않은 10~13번 프레임도 수정하지 않았다. 전체 14프레임의 `load_pixels` 검사와 embedded SHP 재인코딩·재디코딩을 통과했다.
+## 보존할 속성
 
-수정 전 열 장은 `build/analysis/mentat-png-transparency-fix/frame_XXX.before.png`로 보존했다. 프레임별 공급 원본·수정 전후 해시·검사 결과는 같은 폴더 `report.json`, 단독 재인코딩 결과는 `MENTAT.ENG`다. 게임 PAK와 EXE는 이번 PNG 설정 복원에서 바꾸지 않았다.
+`import/GFX/images/ENGLISH/MENTAT.ENG/`의 프레임은 크기·색 번호·팔레트·투명색을 보존해야 한다. 투명색 복원은 PNG 메타데이터 변경이며 편집 픽셀 자체를 바꾸는 작업이 아니다.
+
+MENTAT.ENG는 14프레임이다. 원본 프레임과 `load_pixels`를 대조하고 embedded SHP를 재인코딩·재디코딩해 투명색과 픽셀의 일치를 검사한다. 특정 버튼의 설정을 다른 색 번호로 임의 통일하지 않는다.
