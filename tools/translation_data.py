@@ -243,12 +243,10 @@ def classify(row):
 
 ROOT = Path(__file__).resolve().parents[1]
 DRAFT = ROOT/'import/strings/source_strings_complete_ko_draft.csv'
-KEYS = ROOT/'editor/game_shortcuts.csv'
-UNIT_KEYS = ROOT/'editor/unit_command_shortcuts.csv'
 HOUSES = ROOT/'import/strings/executable_house_names.csv'
 REVIEW = ROOT/'export/strings/executable_strings_review.csv'
 REGISTRY = ROOT/'import/fnt/glyph_registry.json'
-TRACKED = [DRAFT, KEYS, UNIT_KEYS, HOUSES, REVIEW, REGISTRY]
+TRACKED = [DRAFT, HOUSES, REVIEW, REGISTRY]
 
 def read_csv(path):
     with path.open(encoding='utf-8-sig', newline='') as f:
@@ -273,6 +271,22 @@ def registry_bytes(syllables):
 
 def row_key(row):
     return '|'.join((row['file'], row['type'], row['index']))
+
+def shortcut_key(text):
+    match = re.search(r'\(([A-Z])\)$', text)
+    return match[1] if match else ''
+
+
+def shortcut_rows(rows):
+    """Read literal hotkey suffixes from the saved translation rows."""
+    result = {}
+    for row in rows:
+        if row['file'] != 'DUNE.ENG' or row['type'] != 'uncompressed_table':
+            continue
+        key = shortcut_key(row['translation_ko'])
+        if key:
+            result[row['index']] = dict(row, shortcut=key)
+    return result
 
 def split_mentat(text):
     # Only the ASCII resource prefix before the first * / ? is immutable.
@@ -307,7 +321,7 @@ class TranslationData:
         self.rows = read_csv(DRAFT)
         self.houses = read_csv(HOUSES)
         self.prepare_syllables()
-        self.keys = {r['index']: r for r in read_csv(KEYS)}
+        self.keys = shortcut_rows(self.rows)
         self.hashes = {str(p): digest(p) for p in TRACKED}
         self.revision = hashlib.sha256(json.dumps(self.hashes, sort_keys=True).encode()).hexdigest()
 
@@ -346,9 +360,9 @@ class TranslationData:
 
     @contextmanager
     def save_lock(self):
-        # Serialize this editor's saves/builds across multiple native windows.
+        # Coordinate writes to the shared translation inputs across processes.
         import msvcrt
-        path = ROOT/'editor/editor-save.lock'
+        path = ROOT/'import/strings/.translation-inputs.lock'
         with path.open('a+b') as handle:
             if handle.seek(0, os.SEEK_END) == 0:
                 handle.write(b'\0')
@@ -357,7 +371,7 @@ class TranslationData:
             try:
                 msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
             except OSError:
-                raise ValueError('다른 에디터 창에서 저장 또는 빌드 중입니다. 입력은 유지됩니다. 잠시 후 다시 저장하세요.') from None
+                raise ValueError('다른 프로세스가 번역 자료를 저장하거나 빌드 중입니다. 잠시 후 다시 시도하세요.') from None
             try:
                 yield
             finally:

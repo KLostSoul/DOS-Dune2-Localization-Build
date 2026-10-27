@@ -383,6 +383,7 @@ def main():
     args = parser.parse_args()
     import cd_source
     originals = cd_source.prepare_exports()
+    cd_source.prepare_build_references()
     import assembler
     data = BuildInputs()
     with data.save_lock():

@@ -338,6 +338,31 @@ def exe_candidates(data: bytes) -> list[dict[str, str]]:
         })
     return rows
 
+def export_executable_review(executable, output, *, house_names=None) -> int:
+    """Write original EXE candidates and optional known house-name records."""
+    data = Path(executable).read_bytes()
+    rows = exe_candidates(data)
+    if house_names is not None:
+        with Path(house_names).open(encoding='utf-8-sig', newline='') as stream:
+            for house in csv.DictReader(stream):
+                offset = int(house['offset_hex'], 16)
+                original = house['source_en'].encode('ascii') + b'\0'
+                if data[offset:offset+len(original)] != original:
+                    raise ValueError('Original EXE house-name reference differs: '+house['source_en'])
+                rows.append(dict(file='DUNE2.EXE', offset_hex=house['offset_hex'],
+                    type='embedded_house_name', source_en_or_literal=house['source_en'],
+                    review_note=f"가문 ID {house['house_id']}; 화면 표시용 한글은 executable_house_names.csv에서 반영; 영문 식별자 보존",
+                    translation_ko=house['translation_ko']))
+    output = Path(output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    fields = ['file', 'offset_hex', 'type', 'source_en_or_literal', 'review_note', 'translation_ko']
+    with output.open('w', encoding='utf-8-sig', newline='') as stream:
+        writer = csv.DictWriter(stream, fieldnames=fields, quoting=csv.QUOTE_MINIMAL)
+        writer.writeheader()
+        writer.writerows(rows)
+    return len(rows)
+
+
 def export_exe_main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--exe", type=Path, default=DEFAULT_EXE, help="DUNE2.EXE path")
@@ -347,14 +372,8 @@ def export_exe_main(argv=None) -> int:
     if executable == DEFAULT_EXE.resolve() and not executable.is_file():
         from cd_source import prepare_exports
         prepare_exports()
-    rows = exe_candidates(executable.read_bytes())
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    fields = ["file", "offset_hex", "type", "source_en_or_literal", "review_note", "translation_ko"]
-    with args.output.open("w", encoding="utf-8-sig", newline="") as stream:
-        writer = csv.DictWriter(stream, fieldnames=fields, quoting=csv.QUOTE_MINIMAL)
-        writer.writeheader()
-        writer.writerows(rows)
-    print(f"Exported {len(rows)} executable string exe_candidates to {args.output}")
+    count = export_executable_review(executable, args.output)
+    print(f"Exported {count} executable string exe_candidates to {args.output}")
     return 0
 
 def main(argv=None):

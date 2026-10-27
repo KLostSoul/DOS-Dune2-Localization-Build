@@ -27,20 +27,17 @@ from functools import lru_cache
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT/'tools'), str(ROOT/'editor'),
-               str(ROOT/'build/analysis-deps')]
+sys.path[:0] = [str(ROOT/'tools'), str(ROOT/'build/analysis-deps')]
 import cd_source
 import clonecd_xdelta
 import build_game as model
 import translation_data
-import editor_model
 import fonts as font_tools
 import runtime_patches as runtime
 import scenes
 import apply_hitsquad107_fix as hitsquad
 from runtime_patches import module_at
 from resources import unpack_pak
-from unit_edits import UnitEdits
 from capstone import Cs, CS_ARCH_X86, CS_MODE_16
 from unicorn import Uc, UC_ARCH_X86, UC_MODE_16, UC_HOOK_CODE, UC_HOOK_INTR
 from unicorn.x86_const import *
@@ -156,7 +153,8 @@ def check_package(folder):
     manifest = json.loads(clonecd_xdelta.MANIFEST.read_text(encoding='utf-8'))
     game = (folder/GAME).resolve()
     assert Path(manifest['game_dir']).resolve() == game and game.is_dir()
-    original = cd_source.IMAGE.read_bytes()
+    source_image = cd_source.find_image()
+    original = source_image.read_bytes()
     assert hashlib.sha256(original).hexdigest() == cd_source.IMAGE_SHA256 == manifest['source_img_sha256']
     image = clonecd_xdelta.BIN.read_bytes()
     assert hashlib.sha256(image).hexdigest() == manifest['target_bin_sha256']
@@ -201,7 +199,7 @@ def check_package(folder):
     tool = clonecd_xdelta.xdelta3_path(None)
     with scratch() as temporary:
         decoded = temporary/'decoded.bin'
-        subprocess.run([str(tool), '-f', '-d', '-s', str(cd_source.IMAGE),
+        subprocess.run([str(tool), '-f', '-d', '-s', str(source_image),
                         str(clonecd_xdelta.PATCH), str(decoded)], check=True,
                        capture_output=True, timeout=120)
         assert decoded.read_bytes() == image, 'Xdelta decoded output differs from final BIN'
@@ -1792,10 +1790,28 @@ def check_cheats(folder):
                 background_io='stubbed; restore-before-command order checked')
 
 
+def editor_checks_available():
+    return all((ROOT/'editor'/name).is_file()
+               for name in ('editor_model.py', 'desktop.py', 'unit_edits.py', 'build_runner.py'))
+
+
+def load_editor_checks():
+    """Load optional local UI checks only when they are selected."""
+    global editor_model, UnitEdits
+    if not editor_checks_available():
+        raise ValueError('Optional local editor sources are not installed.')
+    path = str(ROOT/'editor')
+    if path not in sys.path:
+        sys.path.insert(0, path)
+    import editor_model
+    from unit_edits import UnitEdits
+
+
 @contextmanager
 def isolated_editor():
     """Redirect both pure CSV data and editor state into scratch."""
-    keys = ('ROOT', 'DRAFT', 'KEYS', 'UNIT_KEYS', 'HOUSES', 'REVIEW', 'REGISTRY', 'TRACKED')
+    load_editor_checks()
+    keys = ('ROOT', 'DRAFT', 'HOUSES', 'REVIEW', 'REGISTRY', 'TRACKED')
     saved_data = {key: getattr(translation_data, key) for key in keys}
     saved_editor = {key: getattr(editor_model, key) for key in (*keys, 'SESSION')}
     originals = {path: digest(path) for path in [*translation_data.TRACKED, editor_model.SESSION] if path.is_file()}
@@ -1887,6 +1903,7 @@ print(json.dumps({'component': component, 'count': count, 'imports_separate': Tr
 
 
 def check_editor(folder):
+    load_editor_checks()
     boundaries = check_component_boundaries()
     with isolated_editor() as (fixture, originals):
         m = editor_model.EditorModel()
@@ -1965,6 +1982,7 @@ def check_editor(folder):
 
 
 def check_editor_gui(folder):
+    load_editor_checks()
     import tkinter as tk
     from tkinter import messagebox
     from desktop import Editor
@@ -2122,6 +2140,24 @@ def check_editor_gui(folder):
                 report['greeting_fields_preserved_after_new_editor'] = reopened_fields == greeting_fields
                 reopened_window.destroy()
                 assert reopened_fields == greeting_fields
+                hotkey = 'DUNE.ENG|uncompressed_table|1|text'
+                choose(hotkey)
+                for text, expected, key in (('공격 수정', '공격 수정(A)', 'A'),
+                                            ('공격 수정(B)', '공격 수정(B)', 'B')):
+                    field = editor.target_fields[0]
+                    field.delete('1.0', 'end')
+                    field.insert('1.0', text)
+                    root.update()
+                    editor.save()
+                    root.update()
+                    assert fields() == [expected], (fields(), errors)
+                    assert hotkey not in editor.drafts, (editor.drafts, errors)
+                    assert editor.entries[hotkey]['shortcut'] == key
+                    assert editor.model.keys['1']['shortcut'] == key
+                assert not (fixture/'editor/game_shortcuts.csv').exists()
+                assert not (fixture/'editor/unit_command_shortcuts.csv').exists()
+                report['shortcut_single_csv'] = dict(removed_suffix_restored=True,
+                    changed_key_saved_without_duplicate=True, legacy_shortcut_tables_used=False)
                 report['result'] = 'passed'
             except Exception:
                 report['result'] = 'failed'
@@ -2169,9 +2205,14 @@ def main():
     if args.list:
         for name, (description, _) in SECTIONS.items(): print(f'{name}: {description}')
         return 0
-    names = args.only or [name for name in SECTIONS if name != 'editor-gui']
-    if args.editor_gui and 'editor-gui' not in names: names.append('editor-gui')
-    protected = [*translation_data.TRACKED, editor_model.SESSION]
+    defaults = [name for name in SECTIONS if name not in ('editor', 'editor-gui')]
+    names = args.only or defaults
+    if args.editor_gui:
+        for name in ('editor', 'editor-gui'):
+            if name not in names: names.append(name)
+    if not editor_checks_available() and any(name in ('editor', 'editor-gui') for name in names):
+        parser.error('Optional local editor sources are not installed.')
+    protected = [*translation_data.TRACKED, ROOT/'editor/editor_session.json']
     protected += [path for path in (BUILD/GAME).rglob('*') if path.is_file()]
     protected += [clonecd_xdelta.BIN, clonecd_xdelta.CUE, clonecd_xdelta.PATCH, clonecd_xdelta.MANIFEST]
     before = {path: digest(path) for path in protected if path.is_file()}
@@ -2194,7 +2235,7 @@ def main():
     report['protected_inputs_and_products_unchanged'] = not changed
     report['changed_files'] = changed
     report['passed'] = not changed and all(item['status'] == 'passed' for item in report['sections'].values())
-    report['full_default_suite'] = set(SECTIONS)-{'editor-gui'} <= set(names)
+    report['full_default_suite'] = set(defaults) <= set(names)
     target = ROOT/'build/checks/final-build-check.json'
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(report, ensure_ascii=False, indent=2)+chr(10), encoding='utf-8')

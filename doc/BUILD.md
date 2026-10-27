@@ -6,24 +6,23 @@
 python tools/build_game.py
 ```
 
-게임 파일은 `build/final-build/source/VIRGIN/DUNE2/`에 생성한다. 빌드는 게임 파일과 BIN/CUE·Xdelta 생성까지 맡고, 게임 실행 환경의 선택·설정과 실행은 사용자가 맡는다. 현재 실행 파일·산출물 해시와 사용자 확인 범위는 [STATUS](STATUS.md), 배포 패치 적용은 [PATCHING](PATCHING.md)에 있다.
+게임 파일은 `build/final-build/source/VIRGIN/DUNE2/`에 생성한다. 빌드는 게임 파일과 BIN/CUE·Xdelta 생성까지 맡고, 게임 실행 환경의 선택·설정과 실행은 사용자가 맡는다. 현재 실행 파일·산출물 해시는 [STATUS](STATUS.md), 배포 패치 적용은 [PATCHING](PATCHING.md)에 있다.
 
 ## 빌드 환경
 
-| 항목 | 현재 로컬 구성 |
+| 항목 | 요구 사항 |
 |---|---|
-| Python | Python 3.14.9, `C:/Users/LS/AppData/Local/Python/pythoncore-3.14-64/python.exe` |
+| Python | Python 3.14 |
 | CG 처리 | Pillow |
 | ASM 조립 | 프로젝트의 `import/asm/JWasm.exe` v2.20 |
 | CD 패치 | `xdelta3.exe`; 검색 경로는 [PATCHING](PATCHING.md#실행-도구) 참조 |
 
-DOSBox-X나 특정 에뮬레이터의 설치·설정은 빌드 요건이 아니다. 빌더는 에뮬레이터 설정이나 게임 실행 BAT를 읽거나 생성하지 않는다.
 
 ## 빌드 입력
 
 | 입력 | 위치 |
 |---|---|
-| 원본 CD | `img/DUNE2CD.img` |
+| 원본 CD | `img/`에서 기준 SHA-256과 일치하는 파일 자동 선택. 파일명·확장자 제한 없음 |
 | 원본 실행 파일 | `export/DUNE2.EXE` |
 | 원본 PAK | `export/PAK/DUNE.PAK`, `ENGLISH.PAK`, `SCENARIO.PAK` |
 | 번역·가문 이름 | `import/strings/source_strings_complete_ko_draft.csv`, `executable_house_names.csv` |
@@ -36,7 +35,17 @@ DOSBox-X나 특정 에뮬레이터의 설치·설정은 빌드 요건이 아니�
 | HitSquad 1.07 Fix | `import/patches/dune2eng1.07fix/V107UPG/HITSQUAD/` |
 | 게임 자체의 기본 설정 | `import/runtime-settings.json` |
 
-원본 CD는 [PATCHING의 입력 해시](PATCHING.md#패치-입력)와 대조한다. 네 export 원본이 없으면 CD에서 추출하고, 이미 있는 파일도 기록된 원본 해시로 검사한다. 전체 등록 음절은 영구 문자표에서 읽으며 새 음절만 CSV 저장 또는 성공한 빌드에서 등록한다. 자세한 글꼴·토큰·메모리 규칙은 [FONTS](FONTS.md), PNG 입력 규칙은 [GRAPHICS](GRAPHICS.md)를 따른다.
+원본 CD는 [PATCHING의 입력 해시](PATCHING.md#패치-입력)와 대조한다. 네 export 원본이 없으면 CD에서 추출하고, 이미 있는 파일도 기록된 원본 해시로 검사한다. 전체 등록 음절은 영구 문자표에서 읽으며 새 음절은 성공한 빌드에서 등록한다. 자세한 글꼴·토큰·메모리 규칙은 [FONTS](FONTS.md), PNG 입력 규칙은 [GRAPHICS](GRAPHICS.md)를 따른다.
+
+최종 빌드 명령은 원본 파일 준비 직후 다음 자료도 자동 생성한다.
+
+- `export/GFX/manifest.json`: 원본 리소스·프레임 대응 정보
+- `export/GFX/resources/`: 편집 대상의 원본 CG 리소스
+- `export/GFX/images/`: 해당 원본 CG에서 디코딩한 PNG
+- `export/strings/executable_strings_review.csv`: 원본 EXE 문자열 후보와 알려진 가문 이름
+
+이미 있는 자료는 유지하고, CG 기준 자료 중 빠진 리소스·원본 PNG는 원본에서 다시 추출한다. 기존 EXE 검토 CSV의 메모와 번역을 덮어쓰지 않으며 `import/GFX/images/`의 편집 PNG도 변경하지 않는다. 생성 중간 자료는 `temp/`에서 정리한다.
+
 
 네 원본 파일만 준비할 때는 다음 명령을 사용한다.
 
@@ -52,7 +61,7 @@ python tools/cd_source.py extract --output "build/original-inspection" --unpack-
 
 ## 생성 과정
 
-1. 원본 CD·export 파일·번역 입력을 검사하고 현재 전체 음절에 가나다순 2바이트 토큰을 지정한다.
+1. 원본 CD·네 export 원본을 검사하고 없는 CG 기준·원본 PNG·EXE 검토표를 생성한다. 번역 입력을 검사하고 전체 음절에 가나다순 2바이트 토큰을 지정한다.
 2. 세 PAK를 메모리에서 풀고 CSV로 일반 문자열, 멘타트 NAME/DESC/INFO와 지도 문구를 생성한다.
 3. HEX에서 완성 `DUNEHAN.FNT`를 한 번 생성한다. 원본 EXE에 고정 바이트 패치를 적용하고 완성 FNT의 레코드를 사용해 폰트 코드 템플릿을 조립한다.
 4. 편집 PNG를 인코딩해 해당 PAK 멤버에 병합하고, 자막·원본 스타일·유니폰트·치트·영상·간격 패치를 적용한다. 치트 모듈은 최종 폰트 배치 주소에서 조립하며 MZ 이미지·재배치·스택을 계산한다.
@@ -72,9 +81,9 @@ python tools/cd_source.py extract --output "build/original-inspection" --unpack-
 
 ## 고정 코드 패치와 HitSquad Fix
 
-`import/asm/font/dalmoori-base.asm`은 출력 코드의 배치를 보존하는 코드 템플릿이다. `import/cd-runtime-base.json` version 2는 원본 EXE와 템플릿에 적용할 위치·수정 전후 바이트·확인 해시를 담은 입력이다. 완성 FNT 데이터로 후크를 구성하며 초기 음절 CSV나 초기 FNT를 생성하지 않는다. 빌드는 현재 CD·입력 자료에서 시작하며 과거 게임 빌드·보관 ZIP을 읽지 않는다.
+`import/asm/font/dalmoori-base.asm`은 출력 코드의 배치를 보존하는 코드 템플릿이다. `import/cd-runtime-base.json` version 2는 원본 EXE와 템플릿에 적용할 위치·수정 전후 바이트·확인 해시를 담은 입력이다. 완성 FNT 데이터로 후크를 구성한다.
 
-`tools/apply_hitsquad107_fix.py`는 공식 Fix 폴더의 EXE·시나리오·멘타트·VOC·SETUP 자료를 병합한다. 번역과 보안 질문 생략·페이드 수정은 유지한다. 현재 결정에 따라 보안 경로의 오버레이 7바이트는 제외하며, 별도 SFX-FIX의 Windows 음성 지연 파일과 GUS-FIX 설정도 적용하지 않는다. 기본 Fix의 VOC·SETUP 교체와 선택 패치를 구분한다. 실제 입력 해시·적용·제외 내역은 `build/final-build/hitsquad107-fix-report.json`에 기록한다.
+`tools/apply_hitsquad107_fix.py`는 공식 Fix 폴더의 EXE·시나리오·멘타트·VOC·SETUP 자료를 병합한다. 번역과 보안 질문 생략·페이드 수정은 유지한다. 보안 경로의 오버레이 7바이트, SFX-FIX의 Windows 음성 지연 파일과 GUS-FIX 설정은 적용 대상에서 제외한다. 실제 입력 해시·적용·제외 내역은 `build/final-build/hitsquad107-fix-report.json`에 기록한다.
 
 ## 검수와 기록
 
@@ -82,9 +91,9 @@ python tools/cd_source.py extract --output "build/original-inspection" --unpack-
 python tools/check_final_build.py
 ```
 
-검사 범위·선택 실행·의존성은 [도구 안내](../tools/README.md#최종-빌드-검사)에 정리했다. 생성 코드·완성 FNT·컴파일러 기록은 `build-report.json`의 `runtime_source`, `font_build`, `assembly_compiler`에 있고, 최신 산출물 식별은 [STATUS](STATUS.md)를 따른다. 이전 CD 재현 대조의 원시 기록은 `build/analysis/cd-build-migration/`에 있다. 원본 역분석 문서는 [원본 분석 목록](README.md#원본-분석-기록)에서 찾는다.
+검사 범위·선택 실행·의존성은 [도구 안내](../tools/README.md#최종-빌드-검사)에 정리했다. 생성 코드·완성 FNT·컴파일러 기록은 `build-report.json`의 `runtime_source`, `font_build`, `assembly_compiler`에 있고, 최신 산출물 식별은 [STATUS](STATUS.md)를 따른다. 원본 역분석 문서는 [원본 분석 목록](README.md#원본-분석-기록)에서 찾는다.
 
-현재 산출물을 갱신하지 않고 생성 과정만 확인하려면 다음 명령을 사용한다. 결과는 임시 폴더에서 검수한 뒤 삭제한다.
+실행용 게임 폴더와 배포물을 교체하지 않고 생성 과정을 검사하려면 다음 명령을 사용한다. 원본 기준 자료 준비와 폰트 생성은 수행한다.
 
 ```powershell
 python tools/build_game.py --no-publish

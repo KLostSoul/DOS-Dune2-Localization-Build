@@ -1,13 +1,13 @@
 # 문서 목차
 
-최종 빌드 사용 안내는 아래 7개 문서에서 관리한다. 파일명은 영어로 통일했으며 본문은 한국어다. 실행본·해시·사용자 확인 결과는 STATUS 한 곳에서 관리한다.
+빌드·번역·CG 편집과 패치 적용 방법을 안내한다.
 
 ## 최종 빌드 안내
 
 | 문서 | 내용 |
 |---|---|
 | [STATUS.md](STATUS.md) | 현재 산출물·해시·적용 기능·확인 결과 |
-| [BUILD.md](BUILD.md) | 실행 환경·원본 입력·독립 최종 빌드·HitSquad Fix·검사 |
+| [BUILD.md](BUILD.md) | 빌드 환경·원본 입력·생성 과정·HitSquad Fix·검사 |
 | [FONTS.md](FONTS.md) | 영구 음절표·완성 FNT 1회 생성·2바이트 토큰·MZ/XMS |
 | [GRAPHICS.md](GRAPHICS.md) | 선택 CG·PNG 인코딩·팔레트·가문 질문 행 |
 | [RUNTIME.md](RUNTIME.md) | 치트·단축키·스타일·간격·임무 전환·영상 수정 |
@@ -18,7 +18,7 @@
 
 ## 원본 분석 기록
 
-`analysis/`에는 역분석·실행 관측·원인 규명 당시의 원본 기록 49개를 유지한다. 이전 정리 때 ZIP 안에만 남았던 기록과 요약으로 대체됐던 원문도 복원했다. 본문·주소·바이트·증거·정정 이력은 보존하고, 문서 파일명과 이동에 따른 링크만 정리했다. 이 기록은 원본 분석 자료이며 별도 보관 문서로 옮기지 않는다. 기록 속 빌드명·해시·후보 상태는 해당 분석 시점의 값이고, 현재 적용 상태는 STATUS를 따른다.
+`analysis/`는 원본 코드의 역분석과 실행 관측 기록이다. 주소·해시·빌드명은 각 기록의 분석 대상을 가리킨다. 현재 적용 상태는 [STATUS](STATUS.md)를 따른다.
 
 ### 엔진·출력·영상·임무 전환
 
@@ -103,7 +103,3 @@
 |---|---|
 | [build_verification_20261022.md](analysis/verification/build_verification_20261022.md) | 현재 빌드와 누적 확인 결과 — 2026-10-22 |
 | [graphics_verification_20261022.md](analysis/verification/graphics_verification_20261022.md) | CG 편집·재인코딩·가문 질문 누적 확인 결과 — 2026-10-22 |
-
-## 이전 정리 자료
-
-기능별 사용자 확인 빌드는 [archives/builds/verified](../archives/builds/verified/README.md)에 유지한다. 이전 문서 정리 당시의 원문 ZIP과 통합 대응표는 [archives/documents](../archives/documents/README.md)에 있다. 원시 분석 JSON·덤프·추적 자료는 각 원본 분석 기록이 가리키는 경로를 따른다.

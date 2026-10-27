@@ -2,6 +2,8 @@
 
 편집할 PNG는 `import/GFX/images/`에 있다. 원본 PAK와 디코딩 기준 자료를 사용해 변경한 리소스만 최종 PAK에 반영한다. 최신 적용본은 [STATUS](STATUS.md), 최종 빌드 명령은 [BUILD](BUILD.md)를 따른다.
 
+최종 빌드는 없는 CG 기준 자료를 원본 PAK에서 자동 추출한다. `export/GFX/`에 매니페스트와 원본 리소스를, `export/GFX/images/`에 원본 PNG를 만든다. 10리소스·44PNG를 사용하며, `import/GFX/images/`의 편집 PNG를 원본으로 교체하지 않는다.
+
 ## 입력과 편집 순서
 
 | 자료 | 경로 |
@@ -67,7 +69,7 @@ BTTN.ENG와 SCREEN.CPS의 버튼 그림은 각각 편집한다. 한쪽을 수정
 | `colour ... absent or ambiguous; use indexed PNG` | RGB에서 원래 색 번호를 결정할 수 없다. 원래 인덱스 팔레트를 유지한 PNG로 저장한다. |
 | `transparency index changed` | 원본과 투명색 메타데이터가 다르다. MENTAT.ENG 버튼은 원래 투명색 0번을 유지한다. |
 
-제공된 원본을 대조한 과정과 검사 범위는 [HERALD 팔레트 복원](analysis/graphics/herald_palette_repair.md), [MENTAT 투명색 복원](analysis/graphics/mentat_transparency_repair.md)에 있다.
+팔레트와 투명색의 원본 분석은 [HERALD 팔레트 복원](analysis/graphics/herald_palette_repair.md), [MENTAT 투명색 복원](analysis/graphics/mentat_transparency_repair.md)에 있다.
 
 ## 보고서와 분석 근거
 

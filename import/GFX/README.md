@@ -1,7 +1,13 @@
-# GFX import images
+# GFX input images
 
-`images/` contains the PNG files that the CG encoder reads when building the game. Edit these files to change CG artwork.
+Edit the PNGs in `images/` to change the game's CG artwork. Keep each image's dimensions, frame number, palette indices, and transparency.
 
-The original CD PAK sources (`DUNE.PAK` and `ENGLISH.PAK`) are in `export/PAK/`. Decoded reference PNGs, raw CG resources, and `manifest.json` are kept under `export/GFX/`. The manifest maps each editable frame to its original frame. The build verifies frame count, dimensions, palette indices, transparency, and encoded pixel round trips before merging only changed PAK members.
+Run from the project root:
 
-Use the editor's **최종 빌드 만들기** action to include these images in a translated build. To encode only the edited CG PAKs, run `py -3 tools/edit_cg.py encode` from the project root.
+```powershell
+python tools/build_game.py
+```
+
+The build extracts original resources and reference PNGs to `export/GFX/`, encodes the PNGs from `import/GFX/images/`, and merges the edited resources into the game PAKs.
+
+Resource selection and encoding options are documented in [GRAPHICS.md](../../doc/GRAPHICS.md).

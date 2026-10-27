@@ -1,5 +1,10 @@
-# Generated game fonts
+# Game font files
 
-The final build generates `DUNEHAN.FNT`, `DUNEUNI.FNT` and `DUNEUNI.MAP` here, then applies those exact bytes to the game directory.
+| File | Purpose |
+|---|---|
+| `glyph_registry.json` | Registered Hangul syllables |
+| `DUNEHAN.FNT` | Generated Dalmoori game font |
+| `DUNEUNI.FNT` | Generated Unifont cinematic font |
+| `DUNEUNI.MAP` | Cinematic glyph lookup table |
 
-`glyph_registry.json` is the shared registered extra-syllable list. The standalone builder combines it with newly used Hangul from the current CSV, sorts the result, and reassigns two-byte tokens. It does not read an editor session to determine the game glyph set.
+Run `python tools/build_game.py` from the project root to generate the font files from the translation CSVs and `font/` HEX sources. New Hangul syllables are registered after a successful build.

@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import struct
+import tempfile
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
-IMAGE = ROOT/'img/DUNE2CD.img'
 IMAGE_SHA256 = 'edcdce3de2e4d986421d99cc11be424277317fc3e8cd71cf78f8ed544bce81bf'
 EXPORTS = {
     'DUNE2.EXE': ('export/DUNE2.EXE', '99f44e83b309dd826f3dbc5068c61679bb68047eed8d738dcef594ba0eef7552'),
@@ -19,6 +20,30 @@ EXPORTS = {
 
 def sha(raw):
     return hashlib.sha256(raw).hexdigest()
+
+
+def find_image(directory=None):
+    """Select the original CD by its bytes, without filename assumptions."""
+    directory = (ROOT/'img' if directory is None else Path(directory)).resolve()
+    if not directory.is_dir():
+        raise FileNotFoundError('원본 CD 폴더가 없습니다: '+str(directory))
+    unreadable = 0
+    for path in sorted(directory.rglob('*'), key=lambda p: p.as_posix().casefold()):
+        if not path.is_file():
+            continue
+        try:
+            digest = hashlib.sha256()
+            with path.open('rb') as stream:
+                for block in iter(lambda: stream.read(1024*1024), b''):
+                    digest.update(block)
+        except OSError:
+            unreadable += 1
+            continue
+        if digest.hexdigest() == IMAGE_SHA256:
+            return path
+    detail = f' (읽을 수 없는 파일 {unreadable}개)' if unreadable else ''
+    raise ValueError(f'원본 CD SHA-256과 일치하는 파일이 없습니다: {directory}\n'
+                     f'필요한 SHA-256: {IMAGE_SHA256}'+detail)
 
 
 def validate_exports():
@@ -33,9 +58,9 @@ def validate_exports():
 
 
 def cd_files():
-    raw = IMAGE.read_bytes()
+    raw = find_image().read_bytes()
     if sha(raw) != IMAGE_SHA256 or len(raw) % 2352:
-        raise ValueError('원본 DUNE2CD.img의 SHA-256 또는 섹터 크기가 다릅니다.')
+        raise ValueError('원본 CD의 SHA-256 또는 섹터 크기가 다릅니다.')
 
     def read(extent, size):
         result = bytearray()
@@ -97,6 +122,61 @@ def prepare_exports():
     return files
 
 
+def prepare_build_references():
+    """Create missing original references without touching edited input PNGs."""
+    from edit_cg import export_assets, inside
+    from resources import export_executable_review
+
+    baseline = (ROOT/'export/GFX').resolve()
+    manifest_path = baseline/'manifest.json'
+    review = ROOT/'export/strings/executable_strings_review.csv'
+    missing_gfx = not manifest_path.is_file()
+    if not missing_gfx:
+        manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+        references = [inside(baseline, record['resource']) for record in manifest['resources']]
+        references += [inside(baseline, frame.get('original_path', frame['path']))
+                       for record in manifest['resources'] for frame in record['frames']]
+        missing_gfx = any(not path.is_file() for path in references)
+    missing_review = not review.is_file()
+    if not missing_gfx and not missing_review:
+        return
+
+    temp_root = ROOT/'temp'
+    temp_root.mkdir(exist_ok=True)
+    try:
+        with tempfile.TemporaryDirectory(prefix='build-references-', dir=temp_root) as temporary:
+            stage = Path(temporary)
+            if missing_gfx:
+                generated = stage/'GFX'
+                export_assets(ROOT/'export/PAK', generated, generated)
+                # Existing original resource bytes must still agree with the CD.
+                for path in (generated/'resources').rglob('*'):
+                    if path.is_file():
+                        target = inside(baseline, path.relative_to(generated))
+                        if target.exists() and target.read_bytes() != path.read_bytes():
+                            raise ValueError('Existing CG baseline differs from the original CD: '+str(target))
+                files = sorted((p for p in generated.rglob('*') if p.is_file()),
+                               key=lambda p: (p.name == 'manifest.json', p.as_posix()))
+                for path in files:
+                    target = inside(baseline, path.relative_to(generated))
+                    if not target.exists():
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        os.replace(path, target)
+                print('Prepared original CG references: export/GFX')
+            if missing_review:
+                generated = stage/'executable_strings_review.csv'
+                export_executable_review(ROOT/'export/DUNE2.EXE', generated,
+                                         house_names=ROOT/'import/strings/executable_house_names.csv')
+                review.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(generated, review)
+                print('Prepared original EXE review: export/strings/executable_strings_review.csv')
+    finally:
+        try:
+            temp_root.rmdir()
+        except OSError:
+            pass
+
+
 def extract_source(destination, *, files=None, runtime_settings=True):
     # Reuse the original-CD map already verified by this build invocation.
     files = prepare_exports() if files is None else files
@@ -114,7 +194,7 @@ def extract_source(destination, *, files=None, runtime_settings=True):
             raise ValueError('로컬 게임 설정 파일 목록이 다릅니다.')
         for name, value in settings.items():
             (destination/'VIRGIN/DUNE2'/name).write_bytes(bytes.fromhex(value))
-    return dict(image=str(IMAGE), image_sha256=IMAGE_SHA256, extracted_files=len(files),
+    return dict(image=str(find_image()), image_sha256=IMAGE_SHA256, extracted_files=len(files),
                 local_runtime_settings=str(settings_path.relative_to(ROOT)) if runtime_settings else None,
                 patch_inputs={name: dict(path=relative, sha256=expected)
                               for name, (relative, expected) in EXPORTS.items()})
@@ -203,7 +283,7 @@ def main():
     args = parser.parse_args()
     if args.command == 'exports':
         prepare_exports()
-        result = dict(image=str(IMAGE), image_sha256=IMAGE_SHA256,
+        result = dict(image=str(find_image()), image_sha256=IMAGE_SHA256,
                       files={name: dict(path=str(ROOT/relative), sha256=expected)
                              for name, (relative, expected) in EXPORTS.items()})
     else:

@@ -1,6 +1,6 @@
 """Build/apply a CloneCD IMG xdelta without changing the owner's source CD.
 
-The source is this project's original, single-track Mode 1/2352 DUNE2CD image.
+The source is the hash-verified original, single-track Mode 1/2352 CD image.
 Unmodified sectors stay byte-for-byte intact. Enlarged ISO files are placed after
 the original lead-out and their ISO9660 directory records are updated. Every
 changed/new raw sector gets a valid Mode 1 EDC and P/Q ECC.
@@ -16,11 +16,11 @@ import shutil
 import struct
 import subprocess
 from pathlib import Path
+from cd_source import find_image, IMAGE_SHA256 as ORIGINAL_SHA256
 
 SECTOR = 2352
 PAYLOAD = 2048
 ROOT = Path(__file__).resolve().parent.parent
-ORIGINAL_SHA256 = "edcdce3de2e4d986421d99cc11be424277317fc3e8cd71cf78f8ed544bce81bf"
 GAME_SUBDIR = Path("source/VIRGIN/DUNE2")
 OUTPUT = ROOT / "output"
 PRODUCT = "Dune2-Battle-for-Arrakis-Korean-v1.01"
@@ -269,14 +269,16 @@ def create_patch(original_dir: Path, game_dir: Path, output_dir: Path,
     """Create one IMG-to-BIN Xdelta patch and a matching BIN/CUE set."""
     patch = output_dir/PATCH.name if patch is None else patch
     manifest_path = output_dir/MANIFEST.name if manifest_path is None else manifest_path
-    original = original_dir / "DUNE2CD.img"
+    original = find_image(original_dir)
     tool = xdelta3_path(xdelta3)
     output_dir.mkdir(parents=True, exist_ok=True)
     target = output_dir / BIN.name
     manifest = build_image(original, game_dir, target)
     manifest["game_dir"] = str(game_dir.resolve())
     patch.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run((str(tool), "-f", "-e", "-s", str(original),
+    # Input filenames must not affect the distributed patch bytes. The source
+    # and output are supplied explicitly and verified by SHA-256.
+    subprocess.run((str(tool), "-f", "-e", "-A", "-s", str(original),
                     str(target), str(patch)), check=True)
     verify = output_dir / f".{PRODUCT}.verify.bin"
     try:
@@ -306,8 +308,7 @@ def main() -> None:
     artifact_dir = args.output_dir if args.mode == 'create' else OUTPUT
     args.patch = args.patch or artifact_dir/PATCH.name
     args.manifest = args.manifest or artifact_dir/MANIFEST.name
-    original = args.original_dir / "DUNE2CD.img"
-    assert sha256(original) == ORIGINAL_SHA256, "Original DUNE2CD.img does not match this patch"
+    original = find_image(args.original_dir)
     target = args.output_dir / BIN.name
     args.output_dir.mkdir(parents=True, exist_ok=True)
     if args.mode == "create":
