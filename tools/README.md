@@ -64,7 +64,7 @@ python tools/check_final_build.py
 
 | 영역 | 검사 대상 |
 |---|---|
-| `package` | 번역 입력에 필요한 모든 FNT 페이지와 BIN 내부 파일, EDC/ECC, CUE, Xdelta 복원 결과 |
+| `package` | 번역 입력에 필요한 모든 FNT 페이지와 BIN 내부 파일, EDC/ECC, CUE, Xdelta 복원 결과·독립 CD 명령의 실패 복구 |
 | `structure` | EXE·MZ 재배치·메모리 경계·HitSquad 패치·저장 실패 시 일괄 복구 |
 | `hangul` | 한글 토큰·글리프·폭·단축키 |
 | `latin` | 영문·숫자·부호와 서식 |
@@ -92,7 +92,7 @@ python tools/check_final_build.py --list
 | 파일 | 역할 |
 |---|---|
 | `build_game.py` | 최종 빌드 |
-| `cd_source.py` | 원본 CD 추출과 기준 자료 준비 |
+| `cd_source.py` | 원본 CD 추출·기준 자료 준비·출력 파일 반영과 복구 |
 | `assembler.py` | ASM 조립 |
 | `apply_hitsquad107_fix.py` | HitSquad 1.07 Fix 반영 |
 | `fonts.py` | 폰트·토큰·메모리 배치 |

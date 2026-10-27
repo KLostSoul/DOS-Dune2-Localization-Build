@@ -9,14 +9,17 @@ changed/new raw sector gets a valid Mode 1 EDC and P/Q ECC.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import hashlib
 import json
 import math
 import re
+import shutil
 import struct
 import subprocess
+import tempfile
 from pathlib import Path
-from cd_source import find_image, IMAGE_SHA256 as ORIGINAL_SHA256
+from cd_source import FileTransaction, find_image, IMAGE_SHA256 as ORIGINAL_SHA256
 
 SECTOR = 2352
 PAYLOAD = 2048
@@ -269,6 +272,42 @@ def xdelta3_path() -> Path:
     return result
 
 
+@contextmanager
+def package_stage(roots):
+    """Keep unverified CD files in temp and restore a failed publication."""
+    temp_root = ROOT/'temp'
+    temp_root.mkdir(parents=True, exist_ok=True)
+    stage = Path(tempfile.mkdtemp(prefix='cd-package-', dir=temp_root))
+    transaction = FileTransaction(stage/'rollback', roots=roots)
+    try:
+        with transaction:
+            yield stage, transaction
+    finally:
+        if stage.exists() and not transaction.rollback_failed:
+            if stage.resolve().parent != temp_root.resolve():
+                raise RuntimeError('CD 임시 경로가 temp/ 밖으로 이동했습니다.')
+            shutil.rmtree(stage)
+        try:
+            temp_root.rmdir()
+        except OSError:
+            pass
+
+
+def validate_output_paths(targets, inputs):
+    resolved = [path.resolve() for path in targets]
+    if len(set(resolved)) != len(resolved):
+        raise ValueError('CD 출력 파일 경로가 서로 겹칩니다.')
+    if set(resolved) & {path.resolve() for path in inputs}:
+        raise ValueError('CD 출력 경로가 입력 파일과 겹칩니다.')
+
+
+def validate_bin(path, manifest):
+    if path.stat().st_size != manifest['target_sectors']*SECTOR:
+        raise ValueError('CD 결과 이미지의 섹터 수가 다릅니다.')
+    if sha256(path) != manifest['target_bin_sha256']:
+        raise ValueError('CD 결과 이미지의 SHA-256이 다릅니다.')
+
+
 def create_patch(original_dir: Path, game_dir: Path, output_dir: Path,
                  patch: Path | None = None, manifest_path: Path | None = None) -> dict:
     """Create one IMG-to-BIN Xdelta patch and a matching BIN/CUE set."""
@@ -276,27 +315,49 @@ def create_patch(original_dir: Path, game_dir: Path, output_dir: Path,
     manifest_path = output_dir/MANIFEST.name if manifest_path is None else manifest_path
     original = find_image(original_dir)
     tool = xdelta3_path()
-    output_dir.mkdir(parents=True, exist_ok=True)
     target = output_dir / BIN.name
-    manifest = build_image(original, game_dir, target)
-    manifest["game_dir"] = str(game_dir.resolve())
-    patch.parent.mkdir(parents=True, exist_ok=True)
-    # Input filenames must not affect the distributed patch bytes. The source
-    # and output are supplied explicitly and verified by SHA-256.
-    subprocess.run((str(tool), "-f", "-e", "-A", "-s", str(original),
-                    str(target), str(patch)), check=True)
-    verify = output_dir / f".{PRODUCT}.verify.bin"
-    try:
+    cue = output_dir/CUE.name
+    validate_output_paths((target, cue, patch, manifest_path), (original,))
+    with package_stage((output_dir, patch.parent, manifest_path.parent)) as (stage, transaction):
+        staged_bin, staged_patch = stage/BIN.name, stage/PATCH.name
+        manifest = build_image(original, game_dir, staged_bin)
+        manifest['game_dir'] = str(game_dir.resolve())
+        # -A keeps both filenames and temporary paths out of the patch bytes.
+        subprocess.run((str(tool), '-f', '-e', '-A', '-s', str(original),
+                        str(staged_bin), str(staged_patch)), check=True)
+        verify = stage/'verify.bin'
         subprocess.run((str(tool), "-f", "-d", "-s", str(original),
-                        str(patch), str(verify)), check=True)
-        assert sha256(verify) == manifest["target_bin_sha256"], "Xdelta round trip mismatch"
-    finally:
-        verify.unlink(missing_ok=True)
-    write_cue(output_dir)
-    manifest["xdelta_patch"] = patch.name
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
-                             encoding="utf-8")
+                        str(staged_patch), str(verify)), check=True)
+        validate_bin(staged_bin, manifest)
+        validate_bin(verify, manifest)
+        write_cue(stage)
+        manifest['xdelta_patch'] = patch.name
+        staged_manifest = stage/'manifest.json'
+        staged_manifest.write_text(json.dumps(manifest, ensure_ascii=False, indent=2)+'\n',
+                                   encoding='utf-8')
+        for source, destination in ((staged_bin, target), (stage/CUE.name, cue),
+                                    (staged_patch, patch), (staged_manifest, manifest_path)):
+            transaction.replace(source, destination)
+    return manifest
+
+
+def apply_patch(original_dir: Path, patch: Path, manifest_path: Path,
+                output_dir: Path) -> dict:
+    original = find_image(original_dir)
+    tool = xdelta3_path()
+    manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+    if manifest['source_img_sha256'] != ORIGINAL_SHA256:
+        raise ValueError('패치의 원본 CD SHA-256이 다릅니다.')
+    target, cue = output_dir/BIN.name, output_dir/CUE.name
+    validate_output_paths((target, cue), (original, patch, manifest_path))
+    with package_stage((output_dir,)) as (stage, transaction):
+        staged_bin = stage/BIN.name
+        subprocess.run((str(tool), '-f', '-d', '-s', str(original),
+                        str(patch), str(staged_bin)), check=True)
+        validate_bin(staged_bin, manifest)
+        write_cue(stage)
+        transaction.replace(staged_bin, target)
+        transaction.replace(stage/CUE.name, cue)
     return manifest
 
 
@@ -312,22 +373,12 @@ def main() -> None:
     artifact_dir = args.output_dir if args.mode == 'create' else OUTPUT
     args.patch = args.patch or artifact_dir/PATCH.name
     args.manifest = args.manifest or artifact_dir/MANIFEST.name
-    original = find_image(args.original_dir)
     target = args.output_dir / BIN.name
-    args.output_dir.mkdir(parents=True, exist_ok=True)
     if args.mode == "create":
         manifest = create_patch(args.original_dir, args.game_dir, args.output_dir,
                                 args.patch, args.manifest)
     else:
-        tool = xdelta3_path()
-        manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
-        assert manifest["source_img_sha256"] == ORIGINAL_SHA256
-        assert target.resolve() != original.resolve(), "Refusing to overwrite source IMG"
-        subprocess.run((str(tool), "-f", "-d", "-s", str(original),
-                        str(args.patch), str(target)), check=True)
-        assert sha256(target) == manifest["target_bin_sha256"], "Patched BIN hash mismatch"
-        write_cue(args.output_dir)
-    assert target.stat().st_size == manifest["target_sectors"] * SECTOR
+        manifest = apply_patch(args.original_dir, args.patch, args.manifest, args.output_dir)
     print(json.dumps({"mode": args.mode, "target": str(target),
                       "sha256": sha256(target), "sectors": manifest["target_sectors"],
                       "patch": str(args.patch)}, ensure_ascii=False))

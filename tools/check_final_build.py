@@ -210,19 +210,114 @@ def check_package(folder):
                         str(clonecd_xdelta.PATCH), str(decoded)], check=True,
                        capture_output=True, timeout=120)
         assert decoded.read_bytes() == image, 'Xdelta decoded output differs from final BIN'
-    return dict(iso_files=len(files), modified_files=len(changed),
+    return dict(standalone_output_failures=check_cd_output_failures(),
+                iso_files=len(files), modified_files=len(changed),
                 modified_sector_edc_ecc_checks=sector_checks,
                 all_iso_files_match_final_or_original=True, no_save_files_added=True,
                 cue_matches_bin=True, xdelta_applied_to_original_matches_bin=True,
                 bin_sha256=manifest['target_bin_sha256'], xdelta_sha256=digest(clonecd_xdelta.PATCH))
 
 
+def check_cd_output_failures():
+    """Isolate standalone command publication from the external codec."""
+    from unittest.mock import patch
+
+    create_cases = apply_cases = 0
+    for mode, cases in (('create', ('encode', 'decode', 'checksum', 1, 2, 3, 4)),
+                        ('apply', ('decode', 'checksum', 1, 2))):
+        for failure in cases:
+            with scratch() as fixture, patch.object(clonecd_xdelta, 'ROOT', fixture):
+                original = fixture/'source.img'
+                original.write_bytes(b'original')
+                output = fixture/'output'
+                patch_path = fixture/'patches/custom.xdelta'
+                manifest_path = fixture/'metadata/custom.json'
+                data = b'N'*clonecd_xdelta.SECTOR
+                manifest = dict(source_img_sha256=cd_source.IMAGE_SHA256,
+                                target_bin_sha256=hashlib.sha256(data).hexdigest(),
+                                target_sectors=1, files=[])
+                old = {output/clonecd_xdelta.BIN.name: b'old-bin',
+                       output/clonecd_xdelta.CUE.name: b'old-cue',
+                       patch_path: b'old-patch',
+                       manifest_path: json.dumps(manifest).encode()}
+                for path, content in old.items():
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_bytes(content)
+
+                def fake_image(source, game, target):
+                    target.write_bytes(data)
+                    return dict(manifest)
+
+                codec_calls = []
+
+                def fake_codec(command, **kwargs):
+                    encoding = '-e' in command
+                    codec_calls.append('encode' if encoding else 'decode')
+                    target = Path(command[-1])
+                    target.write_bytes(b'new-patch' if encoding else data)
+                    if failure == ('encode' if encoding else 'decode'):
+                        raise subprocess.CalledProcessError(1, command)
+                    if failure == 'checksum' and not encoding:
+                        target.write_bytes(b'X'*len(data))
+
+                replace = os.replace
+                count = 0
+
+                def fail_replacement(source, target):
+                    nonlocal count
+                    if str(source).endswith('.publish.tmp'):
+                        count += 1
+                        if count == failure:
+                            raise OSError('injected CD publication failure')
+                    return replace(source, target)
+
+                with patch.object(clonecd_xdelta, 'find_image', return_value=original), \
+                     patch.object(clonecd_xdelta, 'xdelta3_path', return_value=Path('xdelta3.exe')), \
+                     patch.object(clonecd_xdelta, 'build_image', fake_image), \
+                     patch.object(subprocess, 'run', fake_codec), \
+                     patch.object(os, 'replace', fail_replacement):
+                    try:
+                        if mode == 'create':
+                            clonecd_xdelta.create_patch(fixture, fixture/'game', output,
+                                                       patch_path, manifest_path)
+                        else:
+                            clonecd_xdelta.apply_patch(fixture, patch_path, manifest_path, output)
+                    except (OSError, ValueError, subprocess.CalledProcessError):
+                        pass
+                    else:
+                        raise AssertionError((mode, failure, 'failure not reached'))
+                assert all(path.read_bytes() == content for path, content in old.items()), (mode, failure)
+                expected_calls = ['encode'] if mode == 'create' and failure == 'encode' else (
+                    ['encode', 'decode'] if mode == 'create' else ['decode'])
+                assert codec_calls == expected_calls, (mode, failure, codec_calls)
+                if isinstance(failure, int):
+                    assert count == failure
+                assert original.read_bytes() == b'original'
+                assert not (fixture/'temp').exists()
+                if mode == 'create':
+                    create_cases += 1
+                else:
+                    apply_cases += 1
+    return dict(create_failures_preserve_outputs=create_cases,
+                apply_failures_preserve_outputs=apply_cases,
+                custom_paths_preserved=True, temporary_files_removed=True)
+
+
 def check_publish_transaction():
     """Inject a failure at each font/game/package/registry replacement."""
     from unittest.mock import patch
 
+    with scratch() as fixture:
+        transaction = model.FileTransaction(fixture/'rollback')
+        with patch.object(Path, 'exists', return_value=False):
+            try:
+                transaction._parent(fixture/'missing/file')
+            except FileNotFoundError:
+                pass
+            else:
+                raise AssertionError('An unavailable output drive must fail without looping')
     cases = 0
-    for fail_at in range(1, 9):
+    for fail_at in range(1, 10):
         with scratch() as fixture, patch.object(model, 'ROOT', fixture):
             game = fixture/'build/final-build/source/VIRGIN/DUNE2'
             font = fixture/'import/fnt'
@@ -250,6 +345,12 @@ def check_publish_transaction():
 
             def fail_once(source, target):
                 nonlocal count
+                # Backups can be on a different drive from explicit CD outputs.
+                # Restoration must copy to a sibling before the atomic replace.
+                if Path(source).is_relative_to(fixture/'rollback'):
+                    raise OSError('cross-volume rename is not supported')
+                if fail_at == 9 and Path(target) == output/'game.xdelta':
+                    raise OSError('injected build publication failure')
                 if str(source).endswith('.publish.tmp'):
                     count += 1
                     if count == fail_at:
@@ -275,15 +376,19 @@ def check_publish_transaction():
             if fail_at <= 7:
                 assert failed and after == before, (fail_at, before, after)
                 cases += 1
-            else:
+            elif fail_at == 8:
                 assert not failed and count == 7
                 assert (game/'DUNE2.EXE').read_bytes() == b'new-exe'
                 assert registry.read_bytes() == b'new-registry'
                 assert not (game/'DUNEUN1.FNT').exists() and not (font/'DUNEUN1.FNT').exists()
+            else:
+                assert failed and after == before
             assert (game/'_SAVE000.DAT').read_bytes() == b'user-save'
             assert not list(fixture.rglob('*.publish.tmp'))
     return dict(failure_points_restored=cases, font_game_package_registry_rolled_back=True,
-                save_preserved=True, obsolete_font_pages_removed_on_success=True)
+                save_preserved=True, obsolete_font_pages_removed_on_success=True,
+                unwritable_unchanged_target_does_not_block_rollback=True,
+                unavailable_output_drive_fails_without_looping=True)
 
 
 def check_structure(folder):

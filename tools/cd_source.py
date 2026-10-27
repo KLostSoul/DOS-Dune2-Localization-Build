@@ -1,9 +1,10 @@
-"""Read the original CD and prepare the native localization code template."""
+"""Read original CD inputs, prepare native code and safely publish generated files."""
 from __future__ import annotations
 
 import hashlib
 import json
 import os
+import shutil
 import struct
 import tempfile
 from pathlib import Path, PurePosixPath
@@ -16,6 +17,118 @@ EXPORTS = {
     'ENGLISH.PAK': ('export/PAK/ENGLISH.PAK', '576a7bea7826a0c47605c9b3c3abc7e24c74cc834c1b74fd997b2783a011cb74'),
     'SCENARIO.PAK': ('export/PAK/SCENARIO.PAK', 'ca09fed27dfd052f4a2c37a811d3a3e1d549fc5949b4c40424764b56638944a6'),
 }
+
+
+class FileTransaction:
+    """Restore all generated inputs and products if any build step fails."""
+
+    def __init__(self, backup_root, *, roots=None):
+        self.backup_root = backup_root.resolve()
+        self.roots = tuple(Path(root).resolve() for root in (roots or (ROOT,)))
+        self.originals = {}
+        self.modified = set()
+        self.created_directories = []
+        self.rollback_failed = False
+
+    def __enter__(self):
+        return self
+
+    def _target(self, path):
+        target = path.resolve()
+        if not any(target.is_relative_to(root) for root in self.roots):
+            raise ValueError(f'파일 반영 경로가 지정한 출력 폴더 밖입니다: {path}')
+        return target
+
+    def _parent(self, target):
+        missing = []
+        parent = target.parent
+        while not parent.exists():
+            if parent == parent.parent:
+                raise FileNotFoundError(f'출력 드라이브 또는 경로에 접근할 수 없습니다: {parent}')
+            missing.append(parent)
+            parent = parent.parent
+        for directory in reversed(missing):
+            directory.mkdir()
+            self.created_directories.append(directory)
+
+    def _remember(self, target):
+        if target in self.originals:
+            return
+        backup = None
+        if target.exists():
+            if not target.is_file():
+                raise ValueError(f'빌드 출력 대상이 파일이 아닙니다: {target}')
+            backup = self.backup_root/str(len(self.originals))
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(target, backup)
+        self.originals[target] = backup
+
+    def replace(self, source, target):
+        target = self._target(target)
+        self._parent(target)
+        self._remember(target)
+        handle = tempfile.NamedTemporaryFile(dir=target.parent, prefix=target.name+'.',
+                                             suffix='.publish.tmp', delete=False)
+        temporary = Path(handle.name)
+        handle.close()
+        try:
+            shutil.copyfile(source, temporary)
+            os.replace(temporary, target)
+            self.modified.add(target)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    def write(self, target, data):
+        self.backup_root.mkdir(parents=True, exist_ok=True)
+        handle = tempfile.NamedTemporaryFile(dir=self.backup_root, delete=False)
+        source = Path(handle.name)
+        try:
+            with handle:
+                handle.write(data)
+            self.replace(source, target)
+        finally:
+            source.unlink(missing_ok=True)
+
+    def remove(self, target):
+        target = self._target(target)
+        if target.exists():
+            self._remember(target)
+            target.unlink()
+            self.modified.add(target)
+
+    def __exit__(self, kind, error, traceback):
+        if kind is None:
+            return False
+        failures = []
+        for target, backup in reversed(self.originals.items()):
+            if target not in self.modified:
+                continue
+            try:
+                if backup is None:
+                    target.unlink(missing_ok=True)
+                else:
+                    handle = tempfile.NamedTemporaryFile(dir=target.parent,
+                                                         prefix=target.name+'.',
+                                                         suffix='.restore.tmp', delete=False)
+                    temporary = Path(handle.name)
+                    handle.close()
+                    try:
+                        shutil.copy2(backup, temporary)
+                        os.replace(temporary, target)
+                    finally:
+                        temporary.unlink(missing_ok=True)
+            except OSError as failure:
+                failures.append(f'{target}: {failure}')
+        for directory in reversed(self.created_directories):
+            try:
+                directory.rmdir()
+            except OSError:
+                pass
+        if failures:
+            self.rollback_failed = True
+            raise RuntimeError('빌드 복구에 실패했습니다. 복구 자료: '+str(self.backup_root)+
+                               '\n'+'\n'.join(failures)) from error
+        return False
 
 
 def sha(raw):

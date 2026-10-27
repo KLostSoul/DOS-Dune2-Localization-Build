@@ -2,6 +2,8 @@
 
 *Dune II: The Battle for Arrakis* 한국어 패치와 CD 빌드 도구입니다. HitSquad 1.07 Fix를 포함합니다.
 
+![듄 II 한글 타이틀 메뉴](images/00.PNG)
+
 ## 주요 기능
 
 - 가문 소개, 임무 설명·조언, 멘타트, 메뉴, 유닛·건물 정보와 게임 메시지 번역

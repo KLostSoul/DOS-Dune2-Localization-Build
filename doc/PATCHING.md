@@ -40,6 +40,8 @@ python tools/clonecd_xdelta.py apply --original-dir "원본 CD 폴더" --patch "
 
 Python과 프로젝트의 `tools/xdelta3.exe`를 사용한다.
 
+`create`와 `apply`는 `temp/`에서 생성·복원한 BIN의 SHA-256과 섹터 수를 검증한 뒤 결과를 반영한다. 생성·검증·저장 중 실패하면 기존 출력 파일을 유지하거나 이전 상태로 복원한다. `create`는 BIN·CUE·Xdelta·JSON을, `apply`는 BIN·CUE를 함께 처리한다. 복원 자체가 실패하면 복구 자료의 경로를 오류에 표시하고 해당 자료를 유지한다.
+
 ## CD 산출물만 재생성
 
 기존 최종 실행본에서 BIN/CUE·Xdelta를 다시 만들 때는 다음 명령을 사용한다. 기본 게임 입력은 `build/final-build/source/VIRGIN/DUNE2`, 기본 출력은 `output/`이다.

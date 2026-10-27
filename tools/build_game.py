@@ -12,6 +12,7 @@ import tempfile
 from pathlib import Path
 from collections import defaultdict
 import cd_source
+from cd_source import FileTransaction
 import assembler
 import fonts
 import cheats
@@ -89,101 +90,6 @@ class BuildInputs(TranslationData):
         for kind, _, _ in chunks:
             data = bodies[kind]; body += kind+len(data).to_bytes(4, 'big')+data+bytes(len(data)&1)
         return b'FORM'+len(body).to_bytes(4, 'big')+body, dict(records=len(records), expanded=max_expanded, stored=max_stored)
-
-class FileTransaction:
-    """Restore all generated inputs and products if any build step fails."""
-
-    def __init__(self, backup_root):
-        self.backup_root = backup_root.resolve()
-        self.originals = {}
-        self.created_directories = []
-        self.rollback_failed = False
-
-    def __enter__(self):
-        return self
-
-    def _target(self, path):
-        target = path.resolve()
-        if not target.is_relative_to(ROOT.resolve()):
-            raise ValueError(f'빌드 반영 경로가 프로젝트 밖입니다: {path}')
-        return target
-
-    def _parent(self, target):
-        missing = []
-        parent = target.parent
-        while not parent.exists():
-            missing.append(parent)
-            parent = parent.parent
-        for directory in reversed(missing):
-            directory.mkdir()
-            self.created_directories.append(directory)
-
-    def _remember(self, target):
-        if target in self.originals:
-            return
-        backup = None
-        if target.exists():
-            if not target.is_file():
-                raise ValueError(f'빌드 출력 대상이 파일이 아닙니다: {target}')
-            backup = self.backup_root/str(len(self.originals))
-            backup.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(target, backup)
-        self.originals[target] = backup
-
-    def replace(self, source, target):
-        target = self._target(target)
-        self._parent(target)
-        self._remember(target)
-        handle = tempfile.NamedTemporaryFile(dir=target.parent, prefix=target.name+'.',
-                                             suffix='.publish.tmp', delete=False)
-        temporary = Path(handle.name)
-        handle.close()
-        try:
-            shutil.copyfile(source, temporary)
-            os.replace(temporary, target)
-        finally:
-            temporary.unlink(missing_ok=True)
-
-    def write(self, target, data):
-        self.backup_root.mkdir(parents=True, exist_ok=True)
-        handle = tempfile.NamedTemporaryFile(dir=self.backup_root, delete=False)
-        source = Path(handle.name)
-        try:
-            with handle:
-                handle.write(data)
-            self.replace(source, target)
-        finally:
-            source.unlink(missing_ok=True)
-
-    def remove(self, target):
-        target = self._target(target)
-        if target.exists():
-            self._remember(target)
-            target.unlink()
-
-    def __exit__(self, kind, error, traceback):
-        if kind is None:
-            return False
-        failures = []
-        for target, backup in reversed(self.originals.items()):
-            try:
-                if backup is None:
-                    target.unlink(missing_ok=True)
-                else:
-                    os.replace(backup, target)
-            except OSError as failure:
-                failures.append(f'{target}: {failure}')
-        for directory in reversed(self.created_directories):
-            try:
-                directory.rmdir()
-            except OSError:
-                pass
-        if failures:
-            self.rollback_failed = True
-            raise RuntimeError('빌드 복구에 실패했습니다. 복구 자료: '+str(self.backup_root)+
-                               '\n'+'\n'.join(failures)) from error
-        return False
-
 
 def install_final_tree(source, destination, transaction):
     """Install generated files while preserving unrelated files such as saves."""
