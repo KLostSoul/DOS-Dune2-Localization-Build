@@ -6,8 +6,8 @@ import hashlib
 import json
 import re
 import shutil
-import zipfile
 import struct
+import tempfile
 from pathlib import Path
 
 import assembler
@@ -165,16 +165,8 @@ def patch(exe, assembly_folder):
     return patch_module(exe, module, layout)
 
 
-ORIGINAL_SOURCE = ROOT / "build/source"
-ORIGINAL_SOURCE_GAME = ORIGINAL_SOURCE / "VIRGIN/DUNE2"
 ORIGINAL_OUTPUT = ROOT / "build/cheat-runtime"
-ORIGINAL_OUTPUT_TREE = ORIGINAL_OUTPUT / "source"
-ORIGINAL_OUTPUT_GAME = ORIGINAL_OUTPUT_TREE / "VIRGIN/DUNE2"
-ORIGINAL_VERIFIED_ARCHIVE = ROOT / "archives/builds/verified/recovered-verified-dalmuri-cheat-baseline.zip"
-ORIGINAL_VERIFIED_ARCHIVE_SHA256 = "802207e21b7d18d4a82f3613bfe7c8f949feab67fabe94ee0ebfcf2d190deee9"
-ORIGINAL_VERIFIED_HOOK_MEMBER = "recovered-verified-dalmuri-cheat-baseline/cheat-hook-build.asm"
-ORIGINAL_VERIFIED_HOOK_SHA256 = "2de32400ababcfe0b73e45cc08f3ac7ccf9c40ac36375dcca7ca2a5aaa830591"
-ORIGINAL_VERIFIED_BASELINE_EXE_SHA256 = "cff1fbca859634321b798acbd26ac7f16752fe020d61ba542a888badc108a32c"
+ORIGINAL_HOOK_SOURCE = ROOT / "import/asm/cheat/cheat-hook-build.asm"
 ORIGINAL_SOURCE_EXE_SHA256 = "99f44e83b309dd826f3dbc5068c61679bb68047eed8d738dcef594ba0eef7552"
 ORIGINAL_HEADER_BYTES = 0x4C00
 ORIGINAL_BASE_IMAGE_END = 0x41C20
@@ -200,16 +192,10 @@ def original_mz_image_end(exe: bytes) -> int:
     return (pages - 1) * 512 + (last or 512)
 
 
-def original_assemble_module() -> bytes:
-    assembler.ASM = ORIGINAL_OUTPUT / "assembly"
+def original_assemble_module(assembly_folder: Path) -> bytes:
+    assembler.ASM = assembly_folder
     assembler.ASM.mkdir(parents=True, exist_ok=True)
-    archive_bytes = ORIGINAL_VERIFIED_ARCHIVE.read_bytes()
-    if original_sha256(archive_bytes) != ORIGINAL_VERIFIED_ARCHIVE_SHA256:
-        raise ValueError("Verified cheat archive hash changed")
-    with zipfile.ZipFile(ORIGINAL_VERIFIED_ARCHIVE) as archive:
-        source_bytes = archive.read(ORIGINAL_VERIFIED_HOOK_MEMBER)
-    if original_sha256(source_bytes) != ORIGINAL_VERIFIED_HOOK_SHA256:
-        raise ValueError("Archived verified cheat-hook source hash changed")
+    source_bytes = ORIGINAL_HOOK_SOURCE.read_bytes()
     source = source_bytes.decode("ascii").replace("\r\n", "\n").replace("\r", "\n")
     startup = """    call InitializeXms
     mov  dx, cs
@@ -311,35 +297,55 @@ def original_patch_exe(source: bytes, module: bytes) -> tuple[bytes, dict]:
     }
 
 
-def original_main() -> None:
+def original_main() -> dict:
+    import cd_source
+
     if ORIGINAL_OUTPUT.exists():
         raise FileExistsError(f"Build already exists; preserving it: {ORIGINAL_OUTPUT}")
-    source_exe = ORIGINAL_SOURCE_GAME / "DUNE2.EXE"
-    source_bytes = source_exe.read_bytes()
-    module = original_assemble_module()
-    patched_exe, patch_report = original_patch_exe(source_bytes, module)
-    shutil.copytree(ORIGINAL_SOURCE, ORIGINAL_OUTPUT_TREE)
-    (ORIGINAL_OUTPUT_GAME / "DUNE2.EXE").write_bytes(patched_exe)
-
-    report = {
-        "build": str(ORIGINAL_OUTPUT.relative_to(ROOT)),
-        "base_game": str(ORIGINAL_SOURCE.relative_to(ROOT)),
-        "verified_cheat_archive": str(ORIGINAL_VERIFIED_ARCHIVE.relative_to(ROOT)),
-        "verified_cheat_archive_sha256": ORIGINAL_VERIFIED_ARCHIVE_SHA256,
-        "verified_cheat_baseline_exe_sha256": ORIGINAL_VERIFIED_BASELINE_EXE_SHA256,
-        "verified_cheat_hook_source_sha256": ORIGINAL_VERIFIED_HOOK_SHA256,
-        "verified_patch_site_count": 5,
-        "source_exe_sha256": patch_report["source_sha256"],
-        "patched_exe_sha256": patch_report["patched_sha256"],
-        "only_game_executable_modified": True,
-        "game_resources_and_configuration_copied_from_original": True,
-        "added_cheat_commands": ["CREDITS", "WIN", "LOSE"],
-        "startup_stack_handoff_to_original_borland_initializer": True,
-        "runtime_verified": False,
-        "patch": patch_report,
-    }
-    (ORIGINAL_OUTPUT / "original-cheat-report.json").write_text(
-        json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    files = cd_source.cd_files()
+    source_bytes = files["VIRGIN/DUNE2/DUNE2.EXE"]
+    temp_root = ROOT / "temp"
+    temp_root.mkdir(parents=True, exist_ok=True)
+    stage = Path(tempfile.mkdtemp(prefix="original-cheat-", dir=temp_root))
+    transaction = cd_source.FileTransaction(stage / "rollback")
+    try:
+        with transaction, assembler.build_context():
+            module = original_assemble_module(stage / "assembly")
+            patched_exe, patch_report = original_patch_exe(source_bytes, module)
+            tree = stage / "result"
+            cd_source.extract_source(tree / "source", files=files, runtime_settings=False)
+            (tree / "source/VIRGIN/DUNE2/DUNE2.EXE").write_bytes(patched_exe)
+            report = {
+                "build": str(ORIGINAL_OUTPUT.relative_to(ROOT)),
+                "source_cd_sha256": cd_source.IMAGE_SHA256,
+                "cheat_hook_source": str(ORIGINAL_HOOK_SOURCE.relative_to(ROOT)),
+                "cheat_hook_source_sha256": original_sha256(ORIGINAL_HOOK_SOURCE.read_bytes()),
+                "verified_patch_site_count": 5,
+                "source_exe_sha256": patch_report["source_sha256"],
+                "patched_exe_sha256": patch_report["patched_sha256"],
+                "only_game_executable_modified": True,
+                "game_resources_and_configuration_copied_from_original": True,
+                "added_cheat_commands": ["CREDITS", "WIN", "LOSE"],
+                "startup_stack_handoff_to_original_borland_initializer": True,
+                "runtime_verified": False,
+                "patch": patch_report,
+                "assembly_compiler": assembler.build_report(),
+            }
+            (tree / "original-cheat-report.json").write_text(
+                json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+            for path in tree.rglob("*"):
+                if path.is_file():
+                    transaction.replace(path, ORIGINAL_OUTPUT / path.relative_to(tree))
+    finally:
+        if stage.exists() and not transaction.rollback_failed:
+            if stage.resolve().parent != temp_root.resolve():
+                raise RuntimeError("원본 치트 임시 경로가 temp/ 밖으로 이동했습니다.")
+            shutil.rmtree(stage)
+        try:
+            temp_root.rmdir()
+        except OSError:
+            pass
+    return report
 
 
 def main():

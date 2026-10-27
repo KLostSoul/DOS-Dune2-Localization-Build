@@ -89,6 +89,8 @@ python tools/cd_source.py extract --output "build/original-inspection" --unpack-
 
 `tools/apply_hitsquad107_fix.py`는 MrFlibble의 비공식 HitSquad 1.07 Fix 패키지에서 EXE·시나리오·멘타트·VOC·SETUP 자료를 병합한다. 번역과 보안 질문 생략·페이드 수정은 유지한다. 보안 경로의 오버레이 7바이트, SFX-FIX의 Windows 음성 지연 파일과 GUS-FIX 설정은 적용 대상에서 제외한다. 실제 입력 해시·적용·제외 내역은 `build/final-build/hitsquad107-fix-report.json`에 기록한다.
 
+지도 번역이 비어 있으면 원문을 사용하며, 부호 토큰·이스케이프·영문 대체 처리는 공통 문자열 인코더를 사용한다. 멘타트는 항목명이 `전력`·`전력 소비`·`소비 전력`·`Power Needs`인 값만 20·80에서 10·50으로 교정한다. 제목·비용·본문의 다른 숫자는 유지하며, 이미 교정한 값과 사용자가 편집한 다른 표현도 허용한다. 숫자 뒤 공백은 요구하지 않는다.
+
 ## 검수와 기록
 
 ```powershell
@@ -102,3 +104,5 @@ python tools/check_final_build.py
 ```powershell
 python tools/build_game.py --no-publish
 ```
+
+검토 빌드의 임시 자료를 삭제한 뒤 반환하는 결과에서 게임·산출물 경로는 `null`이다.

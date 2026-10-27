@@ -54,6 +54,14 @@ python tools/clonecd_xdelta.py apply
 
 `create`는 최종 게임 파일로 BIN/CUE·Xdelta·JSON을 생성하고, `apply`는 원본 CD와 배포 패치에서 BIN/CUE를 생성합니다. [패치 적용 안내](../doc/PATCHING.md)에 경로 옵션이 있습니다.
 
+## 원본 게임과 기본 치트
+
+```powershell
+python tools/cheats.py original
+```
+
+`img/`의 원본 CD에서 게임을 추출하고 현재 기본 치트 ASM을 조립해 `build/cheat-runtime/source/VIRGIN/DUNE2/`에 생성합니다. CREDITS·WIN·LOSE를 추가하며 원본 리소스와 설정을 유지합니다. 출력 폴더가 이미 있으면 덮어쓰지 않고 중단합니다.
+
 ## 최종 빌드 검사
 
 검사에는 Capstone과 Unicorn이 필요합니다.
@@ -96,7 +104,7 @@ python tools/check_final_build.py --list
 | `assembler.py` | ASM 조립 |
 | `apply_hitsquad107_fix.py` | HitSquad 1.07 Fix 반영 |
 | `fonts.py` | 폰트·토큰·메모리 배치 |
-| `cheats.py` | 치트 패치 |
+| `cheats.py` | 치트 패치·원본 CD의 기본 치트 실행본 생성 |
 | `runtime_patches.py` | 게임 화면·문자열·CG 패치 |
 | `scenes.py` | 영상 자막과 애니메이션 패치 |
 | `translation_data.py` | 번역 CSV와 글리프 등록표 |

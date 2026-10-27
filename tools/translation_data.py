@@ -308,6 +308,41 @@ def formats(text):
     return Counter(re.findall(r'%(?!%)[-+ #0]*\d*(?:\.\d+)?[hlL]?[diuoxXfFeEgGcs]',
                               text.replace('%%', '')))
 
+
+def encode_text(text, codes, latin_symbols):
+    """Encode game text with one token, symbol and escape contract."""
+    korean = any(0xAC00 <= ord(ch) <= 0xD7A3 for ch in text)
+    if not korean:
+        text = text.replace('©', '(C)').replace('×', 'x')
+    result = bytearray()
+    at = 0
+    while at < len(text):
+        if text[at] == '\\' and at + 1 < len(text):
+            esc = text[at+1]
+            if esc in 'rnt':
+                result.append({'r': 13, 'n': 10, 't': 9}[esc]); at += 2; continue
+            if esc == 'x' and re.fullmatch('[0-9a-fA-F]{2}', text[at+2:at+4]):
+                value = int(text[at+2:at+4], 16)
+                if value == 0 or value in LEADS:
+                    raise ValueError('문자열 안에 사용할 수 없는 제어 바이트입니다.')
+                result.append(value); at += 4; continue
+        char = text[at]
+        if char in codes:
+            result.extend(codes[char])
+        elif korean and ord(char) in latin_symbols:
+            result.extend(token(len(codes)+latin_symbols.index(ord(char))))
+        else:
+            try:
+                raw = char.encode('cp437')
+            except UnicodeEncodeError:
+                raise ValueError('현재 게임 폰트에 없는 글자: ' + char) from None
+            if raw[0] == 0 or raw[0] in LEADS:
+                raise ValueError('현재 게임 문자 코드와 충돌하는 글자: ' + char)
+            result.extend(raw)
+        at += 1
+    return bytes(result)
+
+
 class TranslationData:
     def __init__(self):
         self.game_files = ROOT/'export'
@@ -397,38 +432,7 @@ class TranslationData:
             raise ValueError('CSV가 다른 프로그램에서 변경되었습니다. 입력 내용을 복사한 뒤 에디터를 다시 열어 주세요.')
 
     def encode(self, text):
-        # Match the proven resource builder's legacy-font substitutions.
-        # Keep the CSV/editor text intact; normalize only the game byte stream.
-        korean = any(0xAC00 <= ord(ch) <= 0xD7A3 for ch in text)
-        if not korean:
-            text = text.replace('©', '(C)').replace('×', 'x')
-        result = bytearray()
-        at = 0
-        while at < len(text):
-            if text[at] == '\\' and at + 1 < len(text):
-                esc = text[at+1]
-                if esc in 'rnt':
-                    result.append({'r': 13, 'n': 10, 't': 9}[esc]); at += 2; continue
-                if esc == 'x' and re.fullmatch('[0-9a-fA-F]{2}', text[at+2:at+4]):
-                    value = int(text[at+2:at+4], 16)
-                    if value == 0 or value in LEADS:
-                        raise ValueError('문자열 안에 사용할 수 없는 제어 바이트입니다.')
-                    result.append(value); at += 4; continue
-            char = text[at]
-            if char in self.codes:
-                result.extend(self.codes[char])
-            elif korean and ord(char) in self.latin_symbols:
-                result.extend(token(len(self.syllables)+self.latin_symbols.index(ord(char))))
-            else:
-                try:
-                    raw = char.encode('cp437')
-                except UnicodeEncodeError:
-                    raise ValueError('현재 게임 폰트에 없는 글자: ' + char) from None
-                if raw[0] == 0 or raw[0] in LEADS:
-                    raise ValueError('현재 게임 문자 코드와 충돌하는 글자: ' + char)
-                result.extend(raw)
-            at += 1
-        return bytes(result)
+        return encode_text(text, self.codes, self.latin_symbols)
 
     def classify(self, row):
         return classify(row)

@@ -13,6 +13,7 @@ import re
 import shutil
 import struct
 import sys
+from functools import partial
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,8 +23,10 @@ from resources import (  # noqa: E402
     expand_pairs,
     iff_chunks,
     pack_pak,
+    stored,
     unpack_pak,
 )
+from translation_data import encode_text, load_latin_records
 
 FIX_SOURCE = ROOT / "import/patches/dune2eng1.07fix/V107UPG/HITSQUAD"
 FIX_INPUT_FILES = (
@@ -66,8 +69,10 @@ def font_codes(source: Path) -> dict[str, bytes]:
     return {row["character"]: bytes.fromhex(row["token_hex"]) for row in rows}
 
 
-def encode(text: str, codes: dict[str, bytes]) -> bytes:
-    return b"".join(codes[char] if char in codes else char.encode("cp437") for char in text)
+def encoder_for_build(source: Path):
+    codes = font_codes(source)
+    symbols = sorted(cp for cp in load_latin_records(ROOT) if cp > 127)
+    return partial(encode_text, codes=codes, latin_symbols=symbols)
 
 
 def fix_executable(raw: bytes) -> tuple[bytes, dict]:
@@ -89,7 +94,7 @@ def fix_executable(raw: bytes) -> tuple[bytes, dict]:
     }
 
 
-def fix_mentat(raw: bytes, name: str) -> tuple[bytes, dict]:
+def fix_mentat(raw: bytes, name: str, encode) -> tuple[bytes, dict]:
     chunks = iff_chunks(raw)
     payload = {kind: data for kind, _, data in chunks}
     desc_start = next(offset for kind, offset, _ in chunks if kind == b"DESC")
@@ -114,13 +119,29 @@ def fix_mentat(raw: bytes, name: str) -> tuple[bytes, dict]:
 
     removed = {37, 44} if name == "MENTATH.ENG" else set()
     changed = {}
-    for index, old, new in ((8, b"20 ", b"10 "), (21, b"80 ", b"50 ")):
+    corrected_captions = []
+    power_labels = {b'powerneeds', encode('전력'), encode('전력소비'), encode('소비전력')}
+    for index, old, new in ((8, b"20", b"10"), (21, b"80", b"50")):
         offset = records[index][1]
         end = descriptions.index(0, offset)
         value = descriptions[offset:end]
-        caption, marker, body = value.partition(b"\x0c")
-        assert marker and caption.count(old) == 1, (name, index)
-        changed[offset] = caption.replace(old, new) + marker + body
+        caption, marker, body = expand_compressed(value).partition(b"\x0c")
+        lines = caption.splitlines(keepends=True)
+        for line_index, line in enumerate(lines):
+            label, colon, field = line.partition(b':')
+            visible_label = re.sub(rb'^[A-Za-z0-9_.-]+\.wsa[*?]', b'', label, flags=re.I)
+            field_label = re.sub(rb'[ \t]+', b'', visible_label).lower()
+            if not colon or field_label not in power_labels:
+                continue
+            # Only the value immediately after the power label is eligible.
+            # Costs, titles, body text and already-corrected values stay intact.
+            match = re.match(rb'([ \t]*)'+old+rb'(?![0-9.])', field)
+            if match:
+                lines[line_index] = label+colon+match[1]+new+field[match.end():]
+        corrected = b''.join(lines)
+        if marker and corrected != caption:
+            changed[offset] = stored(corrected+marker+body)
+            corrected_captions.append(index)
 
     removed_offsets = {records[index][1] for index in removed}
     new_desc = bytearray()
@@ -165,7 +186,8 @@ def fix_mentat(raw: bytes, name: str) -> tuple[bytes, dict]:
     assert len(iff_chunks(output)) == len(chunks)
     return output, {"records_before": len(records), "records_after": len(kept),
                     "power_watts": {"barracks": 10, "starport": 50},
-                    "removed_hit_squad_only_entries": sorted(removed)}
+                    "removed_hit_squad_only_entries": sorted(removed),
+                    "corrected_caption_records": corrected_captions}
 
 
 def region_rows(source: Path, source_rows: list[dict] | None = None) -> dict[str, list[dict]]:
@@ -180,13 +202,14 @@ def region_rows(source: Path, source_rows: list[dict] | None = None) -> dict[str
 
 
 def fix_region(current: bytes, fixed: bytes, name: str, rows: list[dict],
-               codes: dict[str, bytes]) -> tuple[bytes, dict]:
+               encode) -> tuple[bytes, dict]:
     current_lines = current.splitlines(keepends=True)
     fixed_lines = fixed.splitlines(keepends=True)
     old = [REGION_RE.match(line) for line in current_lines]
     old = [match for match in old if match]
     assert len(old) == len(rows)
     patched = []
+    corrected_lines = []
     for line in fixed_lines:
         match = REGION_RE.match(line)
         if not match:
@@ -194,18 +217,19 @@ def fix_region(current: bytes, fixed: bytes, name: str, rows: list[dict],
             continue
         index = len([part for part in patched if REGION_RE.match(part)])
         row = rows[index]
-        original_translation = encode(row["translation_ko"], codes)
-        assert old[index][2].strip() == original_translation, (name, row["index"])
+        original_translation = encode(row["translation_ko"] or row["source_en"])
+        assert old[index][2].strip() == original_translation.strip(), (name, row["index"])
         key = (name, row["index"])
         old_hash = LEGACY_REGION_TEXT_SHA256.get(key)
         correction = (REGION_CORRECTIONS.get(key) if old_hash and
                       sha(row["translation_ko"].encode("utf-8")) == old_hash else None)
-        value = encode(correction, codes) if correction else original_translation
+        value = encode(correction) if correction else original_translation
+        if correction:
+            corrected_lines.append(row["index"])
         patched.append(match[1] + value + (match[3] or b""))
     result = b"".join(patched)
     assert len([1 for line in result.splitlines() if REGION_RE.match(line)]) == len(rows)
-    return result, {"translated_lines": len(rows), "corrected_lines":
-                    [row["index"] for row in rows if (name, row["index"]) in REGION_CORRECTIONS]}
+    return result, {"translated_lines": len(rows), "corrected_lines": corrected_lines}
 
 
 def apply_build(source: Path, output: Path,
@@ -218,7 +242,7 @@ def apply_build(source: Path, output: Path,
         raise FileNotFoundError("Missing HitSquad 1.07 Fix files: " + ", ".join(missing))
     source_game = source / GAME
     source_sha = sha((source_game / "DUNE2.EXE").read_bytes())
-    codes = font_codes(source)
+    encode = encoder_for_build(source)
     region = region_rows(source, translation_rows)
     _, translated_english = unpack_pak((source_game / "ENGLISH.PAK").read_bytes())
     english_names, english = unpack_pak((source_game / "ENGLISH.PAK").read_bytes())
@@ -234,11 +258,11 @@ def apply_build(source: Path, output: Path,
               "mentat": {}, "region": {}}
     exe, report["exe"] = fix_executable((source_game / "DUNE2.EXE").read_bytes())
     for name in ("MENTATA.ENG", "MENTATH.ENG", "MENTATO.ENG"):
-        english[name], report["mentat"][name] = fix_mentat(english[name], name)
+        english[name], report["mentat"][name] = fix_mentat(english[name], name, encode)
     for name in scenario_names:
         if name.startswith("REGION"):
             scenario[name], report["region"][name] = fix_region(
-                scenario[name], fixed_scenario[name], name, region[name], codes)
+                scenario[name], fixed_scenario[name], name, region[name], encode)
         else:
             scenario[name] = fixed_scenario[name]
     # Other patched English strings are spelling fixes already superseded by

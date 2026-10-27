@@ -391,6 +391,131 @@ def check_publish_transaction():
                 unavailable_output_drive_fails_without_looping=True)
 
 
+def check_fix_translation_inputs():
+    """Exercise editable translations through the actual resource/Fix stages."""
+    m = model.BuildInputs()
+    encode = hitsquad.encoder_for_build(BUILD)
+    english = unpack_pak(original_file('ENGLISH.PAK'))[1]
+    cases = 0
+    for name in ('MENTATA.ENG', 'MENTATH.ENG', 'MENTATO.ENG'):
+        rows = [dict(row) for row in m.rows if row['file'] == name]
+        for index, old, new in (('8', '20', '10'), ('21', '80', '50')):
+            target = next(row for row in rows if row['type'] == 'mentat_description' and row['index'] == index)
+            original_text = target['translation_ko']
+            prefix = model.split_mentat(target['source_en'])[0]
+            def caption_case(caption, expected):
+                nonlocal cases
+                target['translation_ko'] = prefix+caption+'\\x0C설명 '+old
+                rebuilt, _ = m.rebuild_mentat(english[name], rows)
+                fixed, _ = hitsquad.fix_mentat(rebuilt, name, encode)
+                chunks = {kind: data for kind, _, data in model.iff_chunks(fixed)}
+                at = 0
+                for _ in range(int(index)):
+                    at += struct.unpack_from('<H', chunks[b'NAME'], at)[0]
+                pointer = int.from_bytes(chunks[b'NAME'][at+2:at+5], 'big')
+                decoded = model.expand_compressed(fixed[pointer:fixed.index(0, pointer)])
+                assert decoded == m.encode(prefix+expected+'\\x0C설명 '+old), (name, index, caption)
+                cases += 1
+            for replacement, expected_number in ((old, new), (new, new),
+                                                   (old+'W', new+'W'), ('1200', '1200'),
+                                                   ('사용자 지정', '사용자 지정')):
+                caption_case('전력 소비: '+replacement, '전력 소비: '+expected_number)
+            for caption, expected in (
+                    (f'전력 소비: {new}\\r비용: {old}', f'전력 소비: {new}\\r비용: {old}'),
+                    (f'전력 소비: {old}\\r비용: {old}', f'전력 소비: {new}\\r비용: {old}'),
+                    (f'비용: {old}\\r전력 소비: {old}', f'비용: {old}\\r전력 소비: {new}'),
+                    (f'건물 {old}\\r전력 소비: {old}', f'건물 {old}\\r전력 소비: {new}'),
+                    (f'비용: {old}', f'비용: {old}'),
+                    (f'전력 비용: {old}', f'전력 비용: {old}'),
+                    (f'전력 소비 비용: {old}', f'전력 소비 비용: {old}'),
+                    (f'Building\\rPower Needs Cost: {old}', f'Building\\rPower Needs Cost: {old}'),
+                    (f'전력 소비: {old}.5\\r비용: {old}', f'전력 소비: {old}.5\\r비용: {old}'),
+                    (f'Building\\rPower Needs: {old}\\rCost: {old}',
+                     f'Building\\rPower Needs: {new}\\rCost: {old}')):
+                caption_case(caption, expected)
+            target['translation_ko'] = original_text
+
+    scenarios = unpack_pak(original_file('SCENARIO.PAK'))[1]
+    fixed_scenarios = unpack_pak(hitsquad.member('SCENARIO.PAK'))[1]
+    region_cases = 0
+    samples = ('', '아트레이데스 × 2.', '아트레이데스 ©',
+               '전력 '+''.join(chr(cp) for cp in m.latin_symbols),
+               r'아트레이데스\t공격', r'아트레이데스\x09공격',
+               '© ×', '  아트레이데스  ')
+    for name in ('REGIONA.INI', 'REGIONH.INI', 'REGIONO.INI'):
+        rows = [dict(row) for row in m.rows if row['file'] == name]
+        for row in rows:
+            if (name, row['index']) in hitsquad.REGION_CORRECTIONS:
+                row['translation_ko'] = '사용자 지정'
+        for text in samples:
+            rows[0]['translation_ko'] = text
+            assert encode(text) == m.encode(text)
+            parts = re.split(b'(\r\n|\r|\n)', scenarios[name])
+            for row in rows:
+                index = int(row['index'].rsplit('line', 1)[1])-1
+                match = re.fullmatch(rb'(\s*ENGTXT\d+\s*=\s*)(.*?)(\s*)', parts[index*2])
+                parts[index*2] = match[1]+m.encode(row['translation_ko'] or row['source_en'])+match[3]
+            fixed, report = hitsquad.fix_region(b''.join(parts), fixed_scenarios[name], name, rows, encode)
+            values = [match[2].strip() for line in fixed.splitlines()
+                      if (match := hitsquad.REGION_RE.match(line))]
+            assert values == [m.encode(row['translation_ko'] or row['source_en']).strip() for row in rows]
+            assert report['corrected_lines'] == []
+            region_cases += 1
+    return dict(mentat_caption_cases=cases, region_translation_cases=region_cases,
+                only_power_fields_corrected=True, shared_symbol_and_escape_encoder=True,
+                region_original_fallback_cases=3, custom_region_translations_preserved=True)
+
+
+def check_no_publish_result():
+    from unittest.mock import patch
+
+    def staged_result(*args, stage_root, **kwargs):
+        return dict(published=False, **{key: str(stage_root/key) for key in
+                    ('build', 'game_dir', 'cd_image', 'xdelta', 'cd_cue')})
+
+    with patch.object(model, '_build_with_stage', side_effect=staged_result):
+        result = model.build(None, publish=False)
+    assert result['temporary_cleaned'] and not result['published']
+    assert all(result[key] is None for key in ('build', 'game_dir', 'cd_image', 'xdelta', 'cd_cue'))
+    return dict(deleted_temporary_paths_not_returned=True)
+
+
+def check_original_cheat_cd():
+    import cheats
+    from unittest.mock import patch
+
+    originals = original_files()
+    with scratch() as fixture, patch.object(cheats, 'ORIGINAL_OUTPUT', fixture/'original-cheat'):
+        assert not cheats.ORIGINAL_OUTPUT.exists()
+        report = cheats.original_main()
+        tree = cheats.ORIGINAL_OUTPUT/'source'
+        assert {p.relative_to(tree).as_posix() for p in tree.rglob('*') if p.is_file()} == set(originals)
+        assert all((tree/name).read_bytes() == raw for name, raw in originals.items()
+                   if name != 'VIRGIN/DUNE2/DUNE2.EXE')
+        exe = (tree/'VIRGIN/DUNE2/DUNE2.EXE').read_bytes()
+        assert digest(tree/'VIRGIN/DUNE2/DUNE2.EXE') == report['patched_exe_sha256']
+        assert report['cheat_hook_source_sha256'] == digest(cheats.ORIGINAL_HOOK_SOURCE)
+        assert exe[image_end(exe):] == originals['VIRGIN/DUNE2/DUNE2.EXE'][cheats.ORIGINAL_BASE_IMAGE_END:]
+        with patch.dict(globals(), CHEAT_SEGMENT=cheats.ORIGINAL_MODULE_SEGMENT):
+            cpu = CheatCPU(exe)
+            previous_bp = cpu.get('bp')
+            def absent_xms(u, number, _):
+                assert number == 0x2F
+                u.reg_write(UC_X86_REG_AX, 0)
+            cpu.u.hook_add(UC_HOOK_INTR, absent_xms)
+            cpu.run(cpu.cs, 0, [(cpu.load, 0x62)])
+            assert cpu.get('dx') == cpu.load+cheats.ORIGINAL_STACK_SEGMENT
+            assert cpu.get('bp') == previous_bp-(cheats.ORIGINAL_STACK_SEGMENT-0x3CFA)
+        try:
+            cheats.original_main()
+        except FileExistsError:
+            pass
+        else:
+            raise AssertionError('Existing original-cheat output must be preserved')
+    return dict(original_CD_files_preserved=True, current_ASM_assembled=True,
+                startup_stack_handoff_executed=True, existing_output_preserved=True)
+
+
 def check_structure(folder):
     report = build_report(folder)
     exe = (folder/GAME/'DUNE2.EXE').read_bytes()
@@ -446,6 +571,9 @@ def check_structure(folder):
         a, b = module_at(exe, seg)+off, module_at(original, seg)+off
         assert exe[a:a+size] == original[b:b+size]
     return dict(publish_transaction=check_publish_transaction(),
+                editable_fix_inputs=check_fix_translation_inputs(),
+                no_publish_result=check_no_publish_result(),
+                original_cheat_CD=check_original_cheat_cd(),
                 mz_relocations=count, resident_end=end, font_end=cheat_at,
                 cheat_bytes=extra['cheat_module_bytes'],
                 stack_segment=extra['new_stack_segment'], runtime_checks=checks,

@@ -133,7 +133,7 @@ def build(self, *, publish=True, original_files=None):
                 pass
     result['temporary_cleaned'] = True
     if not publish:
-        result.update(build=None, cd_image=None, xdelta=None, cd_cue=None,
+        result.update(build=None, game_dir=None, cd_image=None, xdelta=None, cd_cue=None,
                       message='검토 빌드를 생성했고 temp 작업 자료를 정리했습니다. 최종 빌드에는 게시하지 않았습니다.')
     return result
 
