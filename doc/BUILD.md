@@ -15,7 +15,7 @@ python tools/build_game.py
 | Python | Python 3.14 |
 | CG 처리 | Pillow |
 | ASM 조립 | 프로젝트의 `import/asm/JWasm.exe` v2.20 |
-| CD 패치 | `xdelta3.exe`; 검색 경로는 [PATCHING](PATCHING.md#실행-도구) 참조 |
+| CD 패치 | 프로젝트의 `tools/xdelta3.exe` |
 
 
 ## 빌드 입력

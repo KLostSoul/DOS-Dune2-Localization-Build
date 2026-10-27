@@ -12,7 +12,6 @@ import argparse
 import hashlib
 import json
 import math
-import shutil
 import struct
 import subprocess
 from pathlib import Path
@@ -250,27 +249,20 @@ def write_cue(output_dir: Path) -> None:
     (output_dir / CUE.name).write_text(cue, encoding="ascii", newline="")
 
 
-def xdelta3_path(value: str | None) -> Path:
-    if value:
-        result = Path(value)
-    else:
-        located = shutil.which("xdelta3")
-        if located:
-            result = Path(located)
-        else:
-            result = ROOT / "build/analysis-deps/xdelta3-3.2.2/xdelta3-3.2.2-windows-x86_64/xdelta3.exe"
-    assert result.is_file(), f"xdelta3 executable not found: {result}"
+def xdelta3_path() -> Path:
+    result = ROOT / "tools/xdelta3.exe"
+    if not result.is_file():
+        raise FileNotFoundError(f"xdelta3 executable not found: {result}")
     return result
 
 
 def create_patch(original_dir: Path, game_dir: Path, output_dir: Path,
-                 patch: Path | None = None, manifest_path: Path | None = None,
-                 xdelta3: str | None = None) -> dict:
+                 patch: Path | None = None, manifest_path: Path | None = None) -> dict:
     """Create one IMG-to-BIN Xdelta patch and a matching BIN/CUE set."""
     patch = output_dir/PATCH.name if patch is None else patch
     manifest_path = output_dir/MANIFEST.name if manifest_path is None else manifest_path
     original = find_image(original_dir)
-    tool = xdelta3_path(xdelta3)
+    tool = xdelta3_path()
     output_dir.mkdir(parents=True, exist_ok=True)
     target = output_dir / BIN.name
     manifest = build_image(original, game_dir, target)
@@ -303,7 +295,6 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, default=OUTPUT)
     parser.add_argument("--patch", type=Path)
     parser.add_argument("--manifest", type=Path)
-    parser.add_argument("--xdelta3")
     args = parser.parse_args()
     artifact_dir = args.output_dir if args.mode == 'create' else OUTPUT
     args.patch = args.patch or artifact_dir/PATCH.name
@@ -313,9 +304,9 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     if args.mode == "create":
         manifest = create_patch(args.original_dir, args.game_dir, args.output_dir,
-                                args.patch, args.manifest, args.xdelta3)
+                                args.patch, args.manifest)
     else:
-        tool = xdelta3_path(args.xdelta3)
+        tool = xdelta3_path()
         manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
         assert manifest["source_img_sha256"] == ORIGINAL_SHA256
         assert target.resolve() != original.resolve(), "Refusing to overwrite source IMG"

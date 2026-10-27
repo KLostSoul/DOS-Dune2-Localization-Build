@@ -353,8 +353,6 @@ def _build_with_stage(self, *, publish, stage_root, original_files=None):
             temporary = output_dir/(path.name+'.tmp')
             shutil.copyfile(path, temporary)
             os.replace(temporary, output_dir/path.name)
-        latest = dict(build=str(stable_out.relative_to(ROOT)), source_cd_sha256=cd_source.IMAGE_SHA256)
-        (ROOT/'build/latest-build.json').write_text(json.dumps(latest, indent=2)+'\n', encoding='utf-8')
         registry_temp = REGISTRY.with_suffix('.json.tmp')
         registry_temp.write_bytes(registry_bytes(self.syllables))
         os.replace(registry_temp, REGISTRY)

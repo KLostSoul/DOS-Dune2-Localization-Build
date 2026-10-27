@@ -38,7 +38,7 @@ python tools/clonecd_xdelta.py apply --original-dir "원본 CD 폴더" --patch "
 
 ## 실행 도구
 
-Python과 `xdelta3.exe`가 필요하다. Xdelta3를 PATH에 등록하거나 `--xdelta3 "실행 파일 경로"`로 지정한다.
+Python과 프로젝트의 `tools/xdelta3.exe`를 사용한다.
 
 ## CD 산출물만 재생성
 

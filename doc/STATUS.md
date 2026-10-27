@@ -40,4 +40,4 @@
 python tools/check_final_build.py
 ```
 
-결과는 `build/checks/final-build-check.json`에 기록한다. 검사 범위와 요구 패키지는 [도구 안내](../tools/README.md#최종-빌드-검사)를 따른다.
+결과는 `build/final-build-check.json`에 기록한다. 검사 범위와 요구 패키지는 [도구 안내](../tools/README.md#최종-빌드-검사)를 따른다.

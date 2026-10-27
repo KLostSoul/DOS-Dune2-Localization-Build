@@ -196,7 +196,7 @@ def check_package(folder):
     assert [line.strip() for line in cue if line.strip()] == [
         f'FILE "{clonecd_xdelta.BIN.name}" BINARY', 'TRACK 1 MODE1/2352', 'INDEX 1 00:00:00']
     assert manifest['xdelta_patch'] == clonecd_xdelta.PATCH.name
-    tool = clonecd_xdelta.xdelta3_path(None)
+    tool = clonecd_xdelta.xdelta3_path()
     with scratch() as temporary:
         decoded = temporary/'decoded.bin'
         subprocess.run([str(tool), '-f', '-d', '-s', str(source_image),
@@ -2236,7 +2236,7 @@ def main():
     report['changed_files'] = changed
     report['passed'] = not changed and all(item['status'] == 'passed' for item in report['sections'].values())
     report['full_default_suite'] = set(defaults) <= set(names)
-    target = ROOT/'build/checks/final-build-check.json'
+    target = ROOT/'build/final-build-check.json'
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(report, ensure_ascii=False, indent=2)+chr(10), encoding='utf-8')
     print(f'{"PASS" if report["passed"] else "FAIL"}: {target}', flush=True)

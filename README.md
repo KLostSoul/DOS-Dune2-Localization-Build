@@ -12,7 +12,7 @@
 
 ## 빌드
 
-필요한 도구는 Python 3.14, Pillow, Xdelta3입니다. `xdelta3.exe`를 PATH에 등록합니다. ASM 조립에는 포함된 `import/asm/JWasm.exe`를 사용합니다.
+필요한 도구는 Python 3.14와 Pillow입니다. CD 패치에는 포함된 `tools/xdelta3.exe`를 사용합니다. ASM 조립에는 포함된 `import/asm/JWasm.exe`를 사용합니다.
 
 1. `img/` 폴더를 만들고 원본 CD 이미지 파일을 넣습니다. 원본은 [SHA-256](doc/PATCHING.md#패치-입력)으로 식별하므로 파일명과 확장자는 자유입니다.
 2. 프로젝트 루트에서 다음 명령을 실행합니다.
@@ -22,6 +22,15 @@ python tools/build_game.py
 ```
 
 게임 파일은 `build/final-build/source/VIRGIN/DUNE2/`에 생성됩니다. 게임은 사용자가 준비한 DOS 실행 환경에서 실행합니다.
+
+`build/`에는 실행용 게임과 빌드·검사 보고서를 둡니다.
+
+| 경로 | 내용 |
+|---|---|
+| `build/final-build/` | 최종 게임 파일과 빌드 보고서 |
+| `build/final-build/source/VIRGIN/DUNE2/` | 실행용 게임 폴더 |
+| `build/final-build-check.json` | `python tools/check_final_build.py` 실행 시 생성되는 검사 보고서 |
+| `build/analysis-deps/` | 검사용 Capstone·Unicorn의 로컬 설치 위치 |
 
 CD 배포물은 `output/`에 생성됩니다.
 
