@@ -40,7 +40,7 @@
 
 ## MZ 로딩과 FBOV 주소 정정
 
-분석 입력은 `build/dalmuri672-english-subtitles-feedback/source/VIRGIN/DUNE2/DUNE2.EXE`, SHA-256 `642aabea9eb0b1c9945a5c17267b5c5b228ba237effdfccb85a5a04df379e7a3`였다. REA/Ghidra 12.1.4의 x86 16비트 리얼모드 MZ 로딩은 `verified`였다.
+분석 표본의 EXE SHA-256은 `642aabea9eb0b1c9945a5c17267b5c5b228ba237effdfccb85a5a04df379e7a3`였다. REA/Ghidra 12.1.4의 x86 16비트 리얼모드 MZ 로딩은 `verified`였다.
 
 | MZ 항목 | 관측값 |
 |---|---:|
@@ -85,7 +85,7 @@ MZ 헤더·본문·재배치 로더의 바이트 오독 증거는 없었다. 문
 
 추출 표에는 가문별 심문 서문, 정답·오답 응답, 질문과 그림 이름이 있다. 예를 들어 #1은 하코넨에 대한 충성 심문, #10은 `What type of structure is this?`다. 원래 시도 카운터는 0에서 시작하고 3회 초과 또는 상태 플래그 변경으로 종료한다.
 
-수정 빌드 `0x5167C`부터 `0xDA`바이트는 원본 `build/source/VIRGIN/DUNE2/DUNE2.EXE`의 `0x4ED1C`, `dalmuri672-english-subtitles`의 `0x5167C`, 검증된 달무리 치트 기준본의 `0x4FCCC`와 같았다. 이 무조건 정답 동작이 번역·MZ 분석에서 새로 생겼다는 근거는 없다.
+수정 빌드 `0x5167C`부터 `0xDA`바이트는 원본 `export/DUNE2.EXE`의 `0x4ED1C`, `dalmuri672-english-subtitles`의 `0x5167C`, 검증된 달무리 치트 기준본의 `0x4FCCC`와 같았다. 이 무조건 정답 동작이 번역·MZ 분석에서 새로 생겼다는 근거는 없다.
 
 ## 패치 위치와 보존 계약
 

@@ -75,7 +75,9 @@ python tools/cd_source.py extract --output "build/original-inspection" --unpack-
 | BIN·CUE·Xdelta·CD 구성 JSON | 루트 `output/` |
 | 생성 FNT·색인표 | `import/fnt/` |
 
-`DUNEHAN.FNT`와 유니폰트 FNT/MAP은 먼저 `import/fnt/`에 생성한 바이트를 게임 폴더에 적용한다. 게임의 `DUNEHAN.TBL`과 빌드의 `DUNEHAN.TBL.csv`에는 현재 전체 문자표를 기록한다.
+`DUNEHAN.FNT`와 유니폰트 FNT/MAP은 먼저 `import/fnt/`에 생성한 바이트를 게임 폴더에 적용한다. 달무리 글리프 레코드는 EXE 상주 이미지에도 포함되며, 출력 후크가 디스크의 `DUNEHAN.FNT`를 읽어 적재하지는 않는다. 유니폰트 FNT 페이지와 바이너리 위치표 `DUNEUNI.MAP`은 실행 중 XMS에 적재한다.
+
+빌드는 `build/final-build/`에 `DUNEHAN.TBL.csv`, `DUNEHAN.LATIN.csv`, `DUNEUNI.TBL.csv`를 자동 생성한다. 게임 폴더의 `DUNEHAN.TBL`은 첫 번째 CSV의 사본이다. 각 표의 용도는 [폰트 생성 자료](FONTS.md#구현과-원본-분석-기록)에 설명한다.
 
 생성 폰트·게임 파일·CD 배포물·등록 문자표는 같은 복구 범위에서 반영한다. 생성이나 저장 중 오류가 나면 교체한 파일을 빌드 전 상태로 복원한다. 복원 자체가 실패한 경우에는 오류 메시지에 복구 자료 경로를 표시하고 해당 임시 자료를 유지한다. 사용자 세이브 등 생성 대상이 아닌 파일은 보존한다.
 
@@ -85,7 +87,7 @@ python tools/cd_source.py extract --output "build/original-inspection" --unpack-
 
 `import/asm/font/dalmoori-base.asm`은 출력 코드의 배치를 보존하는 코드 템플릿이다. `import/cd-runtime-base.json` version 2는 원본 EXE와 템플릿에 적용할 위치·수정 전후 바이트·확인 해시를 담은 입력이다. 완성 FNT 데이터로 후크를 구성한다.
 
-`tools/apply_hitsquad107_fix.py`는 공식 Fix 폴더의 EXE·시나리오·멘타트·VOC·SETUP 자료를 병합한다. 번역과 보안 질문 생략·페이드 수정은 유지한다. 보안 경로의 오버레이 7바이트, SFX-FIX의 Windows 음성 지연 파일과 GUS-FIX 설정은 적용 대상에서 제외한다. 실제 입력 해시·적용·제외 내역은 `build/final-build/hitsquad107-fix-report.json`에 기록한다.
+`tools/apply_hitsquad107_fix.py`는 MrFlibble의 비공식 HitSquad 1.07 Fix 패키지에서 EXE·시나리오·멘타트·VOC·SETUP 자료를 병합한다. 번역과 보안 질문 생략·페이드 수정은 유지한다. 보안 경로의 오버레이 7바이트, SFX-FIX의 Windows 음성 지연 파일과 GUS-FIX 설정은 적용 대상에서 제외한다. 실제 입력 해시·적용·제외 내역은 `build/final-build/hitsquad107-fix-report.json`에 기록한다.
 
 ## 검수와 기록
 

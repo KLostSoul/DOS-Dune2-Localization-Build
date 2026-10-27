@@ -12,7 +12,7 @@
 
 ## 원인과 추출 경로
 
-원본 CD에서 ISO9660 경로 `/VIRGIN/DUNE2/ENGLISH.PAK`를 직접 읽은 SHA-256은 `576a7bea7826a0c47605c9b3c3abc7e24c74cc834c1b74fd997b2783a011cb74`다. 이 바이트열은 `build/source/VIRGIN/DUNE2/ENGLISH.PAK`와 일치했다. 해당 PAK 안의 `MENTATH.ENG` 멤버도 추출 폴더 파일과 바이트 단위로 일치하며 SHA-256은 `2992a30fa0b2c2703054f10a56bb95c45aad20234b2c44b388c854f61cdfd9f2`다.
+원본 CD에서 ISO9660 경로 `/VIRGIN/DUNE2/ENGLISH.PAK`를 직접 읽은 SHA-256은 `576a7bea7826a0c47605c9b3c3abc7e24c74cc834c1b74fd997b2783a011cb74`다. 이 바이트열은 `export/PAK/ENGLISH.PAK`와 일치했다. 해당 PAK 안의 `MENTATH.ENG` 멤버도 추출 폴더 파일과 바이트 단위로 일치하며 SHA-256은 `2992a30fa0b2c2703054f10a56bb95c45aad20234b2c44b388c854f61cdfd9f2`다.
 
 `tools/resources.py`의 `read_mentat()`는 `MENTNAME` 레코드에서 본문 오프셋을 읽고 압축을 풀어 내용을 `source_en`으로 기록한다. 언어를 판별하거나 독일어 파일에서 가져오는 동작은 없다. 따라서 독일어가 들어간 지점은 CSV 내보내기가 아니라 원본 `ENGLISH.PAK`의 `MENTATH.ENG` 데이터다. 왜 배포 원본의 영어 명명 리소스 안에 이 독일어 항목이 실렸는지는 확인 자료만으로 단정하지 않는다.
 

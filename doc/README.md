@@ -56,7 +56,7 @@
 |---|---|
 | [completed_syllable_fnt_test.md](analysis/fonts/completed_syllable_fnt_test.md) | 조합 글리프와 완성 음절의 대조 방법 |
 | [composed_hangul_fnt.md](analysis/fonts/composed_hangul_fnt.md) | 조합형 한글 FNT의 데이터와 토큰 계약 |
-| [dalmoori639_verified_rebuild.md](analysis/fonts/dalmoori639_verified_rebuild.md) | 달무리 폭 콜백과 문자열 포인터 계약 |
+| [dalmoori_width_contract.md](analysis/fonts/dalmoori_width_contract.md) | 달무리 폭 콜백과 문자열 포인터 계약 |
 | [dalmoori_8x8_test.md](analysis/fonts/dalmoori_8x8_test.md) | 달무리 8×8 완성 음절의 저장과 출력 셀 |
 | [dalmoori_latin_symbols.md](analysis/fonts/dalmoori_latin_symbols.md) | 달무리 영문·숫자·부호의 출력 선택 |
 | [dalmoori_symbols.md](analysis/fonts/dalmoori_symbols.md) | 달무리 부호의 래스터화와 FNT 레코드 |

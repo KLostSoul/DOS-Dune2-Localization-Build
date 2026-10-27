@@ -7,7 +7,7 @@
 | 대상 | 입력·생성 자료 |
 |---|---|
 | 일반 게임 한글 | `font/composed-hangul.hex`의 등록된 완성 음절 → `DUNEHAN.FNT` |
-| 한글 번역 구간의 알파벳·숫자·부호 | 같은 HEX의 달무리 글리프. 원래 ASCII 바이트를 유지하며 출력 글리프·폭 선택 |
+| 한글 번역 구간의 알파벳·숫자·부호 | 같은 HEX의 달무리 글리프. 원래 ASCII 바이트를 유지하며 출력 글리프·폭 선택. 영상에서 수집한 부호는 Unifont 우선 |
 | 오프닝·엔딩·황제 중간 영상 | `font/unifont-16.0.04.hex`에서 사용하는 글자만 선택 → `DUNEUNI.FNT` 페이지·`DUNEUNI.MAP` |
 | 번역되지 않은 출력 | 기존 듄 FNT와 원래 출력 경로 |
 
@@ -48,6 +48,10 @@
 | `tools/fonts.py` | 완성 글리프·토큰·MZ 배치, Unifont FNT/XMS 자료, Latin과 원본 스타일 |
 | `tools/scenes.py` | 영상 자막 토큰 보존 |
 | `tools/build_game.py`, `tools/translation_data.py` | 사용 음절 수집·게임 문자열 인코딩·등록표 저장 |
-| `DUNEHAN.TBL`·`DUNEHAN.TBL.csv`, `DUNEUNI.TBL.csv` | 생성한 전체 토큰·글리프 대응표 |
+| `build/final-build/DUNEHAN.TBL.csv` | 등록 한글의 토큰과 글리프 대응표. 시나리오 패치 인코딩과 최종 빌드 검사에서 사용 |
+| `build/final-build/DUNEHAN.LATIN.csv` | 달무리 알파벳·숫자·부호의 입력 코드·슬롯·셀 폭을 기록한 확인용 표 |
+| `build/final-build/DUNEUNI.TBL.csv` | 영상 글자의 공통 토큰·물리 슬롯·FNT 페이지 대응표. 최종 빌드 검사에서 사용 |
+
+세 CSV는 빌드가 자동 생성하는 결과다. 게임이 직접 읽는 입력 파일이 아니며, 번역 수정은 `import/strings/`의 CSV에서 한다. 게임 폴더의 `DUNEHAN.TBL`은 `DUNEHAN.TBL.csv`와 바이트가 같은 문자표 사본이며, 현재 출력 후크는 이 파일을 읽지 않는다. 유니폰트 후크가 XMS 글리프 위치를 조회할 때는 별도의 바이너리 `DUNEUNI.MAP`을 사용한다.
 
 원본의 명령·메모리 수명·출력 흐름은 [FNT 엔진](analysis/engine/font_engine.md), [폰트 메모리 수명](analysis/fonts/font_memory_lifecycle.md), [달무리 영문·부호](analysis/fonts/dalmoori_latin_symbols.md), [유니폰트 적용 기록](analysis/fonts/unifont_cinematics.md)에 남긴다.
