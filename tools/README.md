@@ -60,7 +60,7 @@ python tools/clonecd_xdelta.py apply
 python tools/cheats.py original
 ```
 
-`img/`의 원본 CD에서 게임을 추출하고 현재 기본 치트 ASM을 조립해 `build/cheat-runtime/source/VIRGIN/DUNE2/`에 생성합니다. CREDITS·WIN·LOSE를 추가하며 원본 리소스와 설정을 유지합니다. 출력 폴더가 이미 있으면 덮어쓰지 않고 중단합니다.
+`img/`의 원본 CD에서 게임을 추출하고 HitSquad 1.07 Fix와 치트 ASM을 적용해 `build/cheat-runtime/source/VIRGIN/DUNE2/`에 생성합니다. CREDITS·WIN·LOSE·FASTBUILD·REVEAL과 `import/runtime-settings.json`의 게임 설정을 적용합니다. 출력 폴더가 이미 있으면 덮어쓰지 않고 중단합니다.
 
 ## 최종 빌드 검사
 
@@ -73,7 +73,7 @@ python tools/check_final_build.py
 | 영역 | 검사 대상 |
 |---|---|
 | `package` | 번역 입력에 필요한 모든 FNT 페이지와 BIN 내부 파일, EDC/ECC, CUE, Xdelta 복원 결과·독립 CD 명령의 실패 복구 |
-| `structure` | EXE·MZ 재배치·메모리 경계·HitSquad 패치·저장 실패 시 일괄 복구 |
+| `structure` | EXE·MZ 재배치·메모리 경계·HitSquad 패치·저장 실패 시 일괄 복구·원본 치트 빌드와 보고서 대조 |
 | `hangul` | 한글 토큰·글리프·폭·단축키 |
 | `latin` | 영문·숫자·부호와 서식 |
 | `unifont` | 영상 글리프·XMS 적재와 해제 |
@@ -85,6 +85,8 @@ python tools/check_final_build.py
 | `spacing` | 정보창 줄 간격 |
 | `cheats` | 치트 명령과 생산·지도 처리 |
 | `scenes` | 하코넨·오르도스 영상 자막과 애니메이션 |
+
+`structure` 검사는 원본 CD와 현재 ASM으로 HitSquad Fix·치트 5개·게임 설정을 적용한 원본 치트 빌드를 `temp/`에 임시 생성합니다. `build/cheat-runtime/`이 있으면 전체 게임 파일을 임시 생성본과 바이트 단위로 대조하고, Fix 보고서의 적용 위치·치트 목록·입력 해시와 조립 기록의 소스 해시·모듈 구성을 확인합니다. 기존 실행본은 보존하며 검사 후 임시 자료를 정리합니다.
 
 특정 영역을 선택하거나 검사 목록을 볼 수 있습니다.
 

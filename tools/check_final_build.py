@@ -1,7 +1,8 @@
 """Verify the final runnable build and its BIN/CUE/Xdelta distribution.
 
 All check implementations live in this file. Checks read the final build,
-current import sources and original CD; they never rebuild or launch the game.
+current import sources and original CD. Temporary fixtures reproduce the original
+cheat build; the final build is not rebuilt and the game is not launched.
 Unicorn executes bounded instruction sequences with explicit service stubs.
 """
 from __future__ import annotations
@@ -484,18 +485,23 @@ def check_original_cheat_cd():
     import cheats
     from unittest.mock import patch
 
+    installed = cheats.ORIGINAL_OUTPUT
     originals = original_files()
+    settings = json.loads((ROOT/'import/runtime-settings.json').read_text(encoding='utf-8'))['files']
+    expected = dict(originals)
+    for name in hitsquad.FIX_INPUT_FILES:
+        if name != 'DUNE2.EXE':
+            expected['VIRGIN/DUNE2/'+name] = hitsquad.member(name)
+    expected.update({'VIRGIN/DUNE2/'+name: bytes.fromhex(raw) for name, raw in settings.items()})
     with scratch() as fixture, patch.object(cheats, 'ORIGINAL_OUTPUT', fixture/'original-cheat'):
-        assert not cheats.ORIGINAL_OUTPUT.exists()
         report = cheats.original_main()
         tree = cheats.ORIGINAL_OUTPUT/'source'
-        assert {p.relative_to(tree).as_posix() for p in tree.rglob('*') if p.is_file()} == set(originals)
-        assert all((tree/name).read_bytes() == raw for name, raw in originals.items()
-                   if name != 'VIRGIN/DUNE2/DUNE2.EXE')
         exe = (tree/'VIRGIN/DUNE2/DUNE2.EXE').read_bytes()
+        expected['VIRGIN/DUNE2/DUNE2.EXE'] = exe
         assert digest(tree/'VIRGIN/DUNE2/DUNE2.EXE') == report['patched_exe_sha256']
-        assert report['cheat_hook_source_sha256'] == digest(cheats.ORIGINAL_HOOK_SOURCE)
-        assert exe[image_end(exe):] == originals['VIRGIN/DUNE2/DUNE2.EXE'][cheats.ORIGINAL_BASE_IMAGE_END:]
+        assert report['cheats_applied'] == ['CREDITS', 'WIN', 'LOSE', 'FASTBUILD', 'REVEAL']
+        assert exe[image_end(exe):] == hitsquad.member('DUNE2.EXE')[cheats.ORIGINAL_BASE_IMAGE_END:]
+        info = report['extra_cheats']
         with patch.dict(globals(), CHEAT_SEGMENT=cheats.ORIGINAL_MODULE_SEGMENT):
             cpu = CheatCPU(exe)
             previous_bp = cpu.get('bp')
@@ -504,15 +510,51 @@ def check_original_cheat_cd():
                 u.reg_write(UC_X86_REG_AX, 0)
             cpu.u.hook_add(UC_HOOK_INTR, absent_xms)
             cpu.run(cpu.cs, 0, [(cpu.load, 0x62)])
-            assert cpu.get('dx') == cpu.load+cheats.ORIGINAL_STACK_SEGMENT
-            assert cpu.get('bp') == previous_bp-(cheats.ORIGINAL_STACK_SEGMENT-0x3CFA)
+            stack = int(info['new_stack_segment'], 16)
+            assert cpu.get('dx') == cpu.load+stack
+            assert cpu.get('bp') == previous_bp-(stack-0x3CFA)
+        targets = [tree]
+        if installed.exists():
+            targets.append(installed/'source')
+        for target in targets:
+            actual = {p.relative_to(target).as_posix(): p.read_bytes() for p in target.rglob('*') if p.is_file()}
+            assert actual == expected, ('Original cheat product differs', str(target), sorted(k for k in actual.keys() | expected.keys() if actual.get(k) != expected.get(k)))
+        if installed.exists():
+            saved = json.loads((installed/'original-cheat-report.json').read_text(encoding='utf-8'))
+            fix = json.loads((installed/'hitsquad107-fix-report.json').read_text(encoding='utf-8'))
+            generated_fix = json.loads((cheats.ORIGINAL_OUTPUT/'hitsquad107-fix-report.json').read_text(encoding='utf-8'))
+            for key, value in generated_fix.items():
+                actual_value = fix.get(key)
+                if key == 'fix_source_dir' and isinstance(actual_value, str):
+                    actual_value, value = actual_value.replace('\\', '/'), value.replace('\\', '/')
+                assert actual_value == value, ('Original cheat Fix report differs', key)
+            assert saved['patched_exe_sha256'] == fix['final_exe_sha256'] == hashlib.sha256(exe).hexdigest()
+            for key in ('source_cd_sha256', 'source_exe_sha256', 'cheat_hook_source_sha256',
+                        'cheats_applied', 'patch_order', 'configuration_overrides',
+                        'extra_cheats', 'modified_game_files'):
+                assert saved.get(key) == report[key], ('Original cheat report differs', key)
+            compiler, generated_compiler = saved['assembly_compiler'], report['assembly_compiler']
+            for key in ('backend', 'jwasm_sha256', 'reference_compiler_invocations'):
+                assert compiler[key] == generated_compiler[key], ('Original cheat compiler differs', key)
+            # OBJ/LST hashes and compiler output include temporary source paths.
+            # Compare the stable source and module evidence across builds.
+            stable = ('name', 'compiler', 'source_sha256', 'module_image_bytes',
+                      'ledata_records', 'ledata_bytes', 'omf_record_types')
+            def fingerprints(value):
+                return [{key: item[key] for key in stable} for item in value['compilations']]
+            assert fingerprints(compiler) == fingerprints(generated_compiler), 'Original cheat assembly records differ'
+            for item in compiler['compilations']:
+                assert all(re.fullmatch(r'[0-9a-f]{64}', item[key]) for key in ('object_sha256', 'listing_sha256'))
         try:
             cheats.original_main()
         except FileExistsError:
             pass
         else:
             raise AssertionError('Existing original-cheat output must be preserved')
-    return dict(original_CD_files_preserved=True, current_ASM_assembled=True,
+    return dict(full_HitSquad_fix=True, five_cheats=True, runtime_settings=True,
+                generated_files_match_expected=True, installed_build_checked=installed.exists(),
+                installed_build_matches_generated=installed.exists(),
+                installed_reports_checked=installed.exists(),
                 startup_stack_handoff_executed=True, existing_output_preserved=True)
 
 
@@ -2527,7 +2569,8 @@ def main():
     protected += [clonecd_xdelta.BIN, clonecd_xdelta.CUE, clonecd_xdelta.PATCH, clonecd_xdelta.MANIFEST]
     before = {path: digest(path) for path in protected if path.is_file()}
     report = dict(build=str(BUILD), created_utc=datetime.now(timezone.utc).isoformat(),
-                  whole_game_launched=False, scope='final build/package + bounded x86 + isolated editor',
+                  whole_game_launched=False, scope='final build/package + bounded x86' +
+                  (' + isolated editor' if any(name in ('editor', 'editor-gui') for name in names) else ''),
                   selected_sections=names, sections={})
     for name in names:
         print(f'[{name}] checking...', flush=True)

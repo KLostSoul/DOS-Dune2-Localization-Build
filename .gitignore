@@ -24,6 +24,7 @@
 !/import/patches/**
 
 # Local emulator state, editor backups, caches, and temporary files
+/run_dosbox_x.bat
 /.emucap/
 **/sessions/
 **/__pycache__/

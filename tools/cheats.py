@@ -218,8 +218,8 @@ def original_assemble_module(assembly_folder: Path) -> bytes:
     return module
 
 
-def original_patch_exe(source: bytes, module: bytes) -> tuple[bytes, dict]:
-    if original_sha256(source) != ORIGINAL_SOURCE_EXE_SHA256:
+def original_patch_exe(source: bytes, module: bytes, *, expected_sha256=ORIGINAL_SOURCE_EXE_SHA256) -> tuple[bytes, dict]:
+    if original_sha256(source) != expected_sha256:
         raise ValueError("Original DUNE2.EXE hash does not match the recorded source")
     if len(source) < ORIGINAL_BASE_IMAGE_END or original_mz_image_end(source) != ORIGINAL_BASE_IMAGE_END:
         raise ValueError("Original MZ load image end changed")
@@ -299,11 +299,18 @@ def original_patch_exe(source: bytes, module: bytes) -> tuple[bytes, dict]:
 
 def original_main() -> dict:
     import cd_source
+    import apply_hitsquad107_fix as fix
 
     if ORIGINAL_OUTPUT.exists():
         raise FileExistsError(f"Build already exists; preserving it: {ORIGINAL_OUTPUT}")
     files = cd_source.cd_files()
-    source_bytes = files["VIRGIN/DUNE2/DUNE2.EXE"]
+    original_exe = files["VIRGIN/DUNE2/DUNE2.EXE"]
+    source_bytes = fix.member("DUNE2.EXE")
+    if original_sha256(original_exe) != ORIGINAL_SOURCE_EXE_SHA256:
+        raise ValueError("Original CD EXE hash mismatch")
+    offsets = [i for i, (a, b) in enumerate(zip(original_exe, source_bytes)) if a != b]
+    if len(original_exe) != len(source_bytes) or set(offsets) != set(fix.RESIDENT_PATCH_OFFSETS) | set(fix.SECURITY_PATCH_OFFSETS):
+        raise ValueError("Full HitSquad EXE patch locations differ")
     temp_root = ROOT / "temp"
     temp_root.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix="original-cheat-", dir=temp_root))
@@ -311,9 +318,14 @@ def original_main() -> dict:
     try:
         with transaction, assembler.build_context():
             module = original_assemble_module(stage / "assembly")
-            patched_exe, patch_report = original_patch_exe(source_bytes, module)
+            patched_exe, patch_report = original_patch_exe(source_bytes, module, expected_sha256=original_sha256(source_bytes))
+            patched_exe, extra_report = patch(patched_exe, stage / "extra-assembly")
             tree = stage / "result"
-            cd_source.extract_source(tree / "source", files=files, runtime_settings=False)
+            cd_source.extract_source(tree / "source", files=files, runtime_settings=True)
+            game = tree / "source/VIRGIN/DUNE2"
+            assets = [name for name in fix.FIX_INPUT_FILES if name != "DUNE2.EXE"]
+            for name in assets:
+                (game/name).write_bytes(fix.member(name))
             (tree / "source/VIRGIN/DUNE2/DUNE2.EXE").write_bytes(patched_exe)
             report = {
                 "build": str(ORIGINAL_OUTPUT.relative_to(ROOT)),
@@ -322,15 +334,32 @@ def original_main() -> dict:
                 "cheat_hook_source_sha256": original_sha256(ORIGINAL_HOOK_SOURCE.read_bytes()),
                 "verified_patch_site_count": 5,
                 "source_exe_sha256": patch_report["source_sha256"],
-                "patched_exe_sha256": patch_report["patched_sha256"],
-                "only_game_executable_modified": True,
-                "game_resources_and_configuration_copied_from_original": True,
-                "added_cheat_commands": ["CREDITS", "WIN", "LOSE"],
+                "patched_exe_sha256": original_sha256(patched_exe),
+                "only_game_executable_modified": False,
+                "game_resources_and_configuration_copied_from_original": False,
+                "added_cheat_commands": ["CREDITS", "WIN", "LOSE", "FASTBUILD", "REVEAL"],
+                "cheats_applied": ["CREDITS", "WIN", "LOSE", "FASTBUILD", "REVEAL"],
+                "extra_cheats": extra_report,
+                "patch_order": ["Full HitSquad 1.07 Fix EXE and runtime files", "CREDITS/WIN/LOSE cheat hooks", "FASTBUILD/REVEAL extension from the final-build cheat module"],
+                "game_execution": "not run; user will verify",
+                "modified_game_files": sorted(path.name for path in game.iterdir() if path.is_file() and files.get("VIRGIN/DUNE2/"+path.name) != path.read_bytes()),
+                "configuration_overrides": {name: dict(source="import/runtime-settings.json", bytes=len(bytes.fromhex(value)), sha256=original_sha256(bytes.fromhex(value))) for name, value in json.loads((ROOT/"import/runtime-settings.json").read_text(encoding="utf-8"))["files"].items()},
                 "startup_stack_handoff_to_original_borland_initializer": True,
                 "runtime_verified": False,
                 "patch": patch_report,
                 "assembly_compiler": assembler.build_report(),
             }
+            fix_report = dict(source_cd_sha256=cd_source.IMAGE_SHA256,
+                              fix_source_dir=str(fix.FIX_SOURCE.relative_to(ROOT)),
+                              fix_input_sha256={name: original_sha256(fix.member(name)) for name in fix.FIX_INPUT_FILES},
+                              base_exe_sha256=original_sha256(original_exe),
+                              fixed_exe_sha256_before_cheat=original_sha256(source_bytes),
+                              applied_exe_offsets=[hex(i) for i in offsets], applied_runtime_files=assets,
+                              not_applied=["SFX-FIX Windows speech-lag files", "GUS-FIX configuration"],
+                              cheats_applied_after_fix=report["cheats_applied"], patch_order=report["patch_order"],
+                              final_exe_sha256=original_sha256(patched_exe), extra_cheats=extra_report,
+                              game_execution=report["game_execution"])
+            (tree/"hitsquad107-fix-report.json").write_text(json.dumps(fix_report, ensure_ascii=False, indent=2)+"\n", encoding="utf-8")
             (tree / "original-cheat-report.json").write_text(
                 json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
             for path in tree.rglob("*"):
@@ -351,7 +380,7 @@ def original_main() -> dict:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=('original',),
-                        help='Create the original-game copy with the verified CREDITS/WIN/LOSE hook')
+                        help='Create the original-game copy with full HitSquad Fix, five cheats and runtime settings')
     args = parser.parse_args()
     if args.command == 'original':
         original_main()
