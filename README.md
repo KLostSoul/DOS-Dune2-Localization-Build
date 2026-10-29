@@ -14,7 +14,7 @@
 
 ## 빌드
 
-필요한 도구는 Python 3.14와 Pillow입니다. CD 패치에는 포함된 `tools/xdelta3.exe`를 사용합니다. ASM 조립에는 포함된 `import/asm/JWasm.exe`를 사용합니다.
+빌드 개발환경은 Python 3.14.9, Pillow 12.3.0, `tools/xdelta3.exe` 3.2.2, `import/asm/JWasm.exe` 2.20입니다.
 
 1. `img/` 폴더를 만들고 원본 CD 이미지 파일을 넣습니다. 원본은 [SHA-256](doc/PATCHING.md#패치-입력)으로 식별하므로 파일명과 확장자는 자유입니다.
 2. 프로젝트 루트에서 다음 명령을 실행합니다.

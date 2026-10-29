@@ -10,7 +10,7 @@ python tools/build_game.py
 
 `img/`에서 원본 CD를 해시로 식별하고 번역·PNG·글꼴·ASM·Fix를 반영합니다. 게임 파일은 `build/final-build/`, BIN/CUE·Xdelta·JSON은 `output/`에 생성됩니다.
 
-필요한 도구는 Python 3.14와 Pillow입니다. CD 패치 도구는 `tools/xdelta3.exe`를 사용합니다. ASM 조립 도구는 `import/asm/JWasm.exe`를 사용합니다.
+빌드 개발환경은 Python 3.14.9, Pillow 12.3.0입니다. CD 패치는 포함된 `tools/xdelta3.exe` v3.2.2, ASM 조립은 `import/asm/JWasm.exe` v2.20을 사용합니다.
 
 ## 원본 추출
 
@@ -119,3 +119,5 @@ python tools/check_final_build.py --list
 ## Xdelta3 라이선스
 
 포함된 `xdelta3.exe` v3.2.2는 Joshua MacDonald의 Xdelta3입니다. [Apache License 2.0 전문](xdelta3-LICENSE.txt)을 함께 제공합니다. 원본 소스는 [jmacd/xdelta](https://github.com/jmacd/xdelta/tree/v3.2.2)에 있습니다.
+
+

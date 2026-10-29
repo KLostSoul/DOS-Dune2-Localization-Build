@@ -12,10 +12,11 @@ python tools/build_game.py
 
 | 항목 | 요구 사항 |
 |---|---|
-| Python | Python 3.14 |
-| CG 처리 | Pillow |
+| Python | 3.14.9 |
+| CG 처리 | Pillow 12.3.0 |
 | ASM 조립 | 프로젝트의 `import/asm/JWasm.exe` v2.20 |
-| CD 패치 | 프로젝트의 `tools/xdelta3.exe` |
+| CD 패치 | 프로젝트의 `tools/xdelta3.exe` v3.2.2 |
+
 
 
 ## 빌드 입력
